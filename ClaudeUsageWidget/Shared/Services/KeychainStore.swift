@@ -9,8 +9,9 @@ enum KeychainError: Error {
 
 struct KeychainStore {
     // Must match the Keychain Sharing entitlement in both targets
-    private let service = "com.yourorg.claudeusagewidget.session"
-    private let accessGroup = "com.yourorg.claudeusagewidget"
+    private let service = "io.github.sergei-matheson.claudeusagewidget.session"
+    // $(AppIdentifierPrefix) expands to TeamID + "." at build time, so the runtime value is HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget
+    private let accessGroup = "HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget"
 
     func save(_ credentials: SessionCredentials) throws {
         let data = try JSONEncoder().encode(credentials)

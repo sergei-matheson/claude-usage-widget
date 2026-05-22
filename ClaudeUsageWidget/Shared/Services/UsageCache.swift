@@ -1,7 +1,7 @@
 import Foundation
 
 struct UsageCache {
-    private let appGroupID = "group.com.yourorg.claudeusagewidget"
+    private let appGroupID = "group.io.github.sergei-matheson.claudeusagewidget"
     private let fileName = "usage_cache.json"
     private let maxCacheAge: TimeInterval = 86400  // 24 hours
 

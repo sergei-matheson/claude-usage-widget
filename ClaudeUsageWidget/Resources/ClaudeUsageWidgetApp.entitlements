@@ -8,11 +8,11 @@
     <true/>
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>group.com.yourorg.claudeusagewidget</string>
+        <string>group.io.github.sergei-matheson.claudeusagewidget</string>
     </array>
     <key>keychain-access-groups</key>
     <array>
-        <string>$(AppIdentifierPrefix)com.yourorg.claudeusagewidget</string>
+        <string>$(AppIdentifierPrefix)io.github.sergei-matheson.claudeusagewidget</string>
     </array>
 </dict>
 </plist>
