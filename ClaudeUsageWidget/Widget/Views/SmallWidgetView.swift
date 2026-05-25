@@ -8,8 +8,16 @@ struct SmallWidgetView: View {
         return min(Double(usage.messagesUsed) / Double(usage.messagesLimit), 1.0)
     }
 
-    private var daysUntilReset: Int {
-        max(Calendar.current.dateComponents([.day], from: Date(), to: usage.periodResetDate).day ?? 0, 0)
+    private var timeUntilReset: String {
+        let now = Date()
+        guard usage.periodResetDate > now else { return "Resetting…" }
+        let components = Calendar.current.dateComponents([.day, .hour, .minute], from: now, to: usage.periodResetDate)
+        let days = components.day ?? 0
+        let hours = components.hour ?? 0
+        let minutes = components.minute ?? 0
+        if days > 0 { return "Resets in \(days)d" }
+        if hours > 0 { return "Resets in \(hours)h" }
+        return "Resets in \(max(minutes, 1))m"
     }
 
     private var isStale: Bool {
@@ -78,16 +86,9 @@ struct SmallWidgetView: View {
     }
 
     private var resetLabel: some View {
-        Group {
-            if usage.periodResetDate < Date() {
-                Text("Resetting…")
-                    .foregroundStyle(.orange)
-            } else {
-                Text("Resets in \(daysUntilReset)d")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .font(.caption2)
+        Text(timeUntilReset)
+            .font(.caption2)
+            .foregroundStyle(usage.periodResetDate < Date() ? .orange : .secondary)
     }
 
     private var staleLabel: some View {

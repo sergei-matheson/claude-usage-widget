@@ -89,11 +89,16 @@ private struct UsageAPIResponse: Codable {
             return ModelUsage(modelName: name, messagesUsed: Int(u.rounded()))
         }
 
+        let sevenDayUtilization = sevenDay?.utilization ?? 0
+        let sevenDayResetDate = parseDate(sevenDay?.resetsAt) ?? Date().addingTimeInterval(86400 * 7)
+
         return UsageData(
             messagesUsed: Int(utilization.rounded()),
             messagesLimit: 100,
             planName: "Pro",
             periodResetDate: resetDate,
+            sevenDayUtilization: Int(sevenDayUtilization.rounded()),
+            sevenDayResetDate: sevenDayResetDate,
             modelBreakdown: modelBreakdown,
             lastUpdated: Date()
         )

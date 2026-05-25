@@ -6,6 +6,12 @@ struct WidgetEntryView: View {
     @Environment(\.widgetFamily) var widgetFamily
 
     var body: some View {
+        widgetContent
+            .containerBackground(for: .widget) { Color.clear }
+    }
+
+    @ViewBuilder
+    private var widgetContent: some View {
         switch entry.state {
         case .unauthenticated:
             UnauthenticatedView()

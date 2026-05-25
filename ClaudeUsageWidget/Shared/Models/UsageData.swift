@@ -5,6 +5,8 @@ struct UsageData: Codable, Equatable {
     let messagesLimit: Int
     let planName: String
     let periodResetDate: Date
+    let sevenDayUtilization: Int
+    let sevenDayResetDate: Date
     let modelBreakdown: [ModelUsage]
     let lastUpdated: Date
 
@@ -13,11 +15,10 @@ struct UsageData: Codable, Equatable {
             messagesUsed: 42,
             messagesLimit: 100,
             planName: "Pro",
-            periodResetDate: Date().addingTimeInterval(86400 * 7),
-            modelBreakdown: [
-                ModelUsage(modelName: "claude-opus-4-7", messagesUsed: 10),
-                ModelUsage(modelName: "claude-sonnet-4-6", messagesUsed: 32)
-            ],
+            periodResetDate: Date().addingTimeInterval(3600 * 3),
+            sevenDayUtilization: 18,
+            sevenDayResetDate: Date().addingTimeInterval(86400 * 5),
+            modelBreakdown: [],
             lastUpdated: Date()
         )
     }
