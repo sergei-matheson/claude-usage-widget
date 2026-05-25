@@ -62,37 +62,49 @@ struct UsageService {
     }
 }
 
-// All fields optional to survive undocumented API schema changes.
+private struct UsageBucket: Codable {
+    let utilization: Double?
+    let resetsAt: String?
+}
+
 private struct UsageAPIResponse: Codable {
-    let messagesUsed: Int?
-    let messagesLimit: Int?
-    let plan: String?
-    let resetDate: String?
-    let models: [UsageAPIModelEntry]?
+    let fiveHour: UsageBucket?
+    let sevenDay: UsageBucket?
+    let sevenDayOpus: UsageBucket?
+    let sevenDaySonnet: UsageBucket?
+    let sevenDayCowork: UsageBucket?
+    let sevenDayOmelette: UsageBucket?
 
     func toUsageData() -> UsageData {
-        let resetDate: Date
-        if let dateString = self.resetDate,
-           let parsed = ISO8601DateFormatter().date(from: dateString) {
-            resetDate = parsed
-        } else {
-            resetDate = Date().addingTimeInterval(86400 * 30)
+        let utilization = fiveHour?.utilization ?? 0
+        let resetDate = parseDate(fiveHour?.resetsAt) ?? Date().addingTimeInterval(3600 * 5)
+
+        let modelBreakdown: [ModelUsage] = [
+            ("claude-opus", sevenDayOpus),
+            ("claude-sonnet", sevenDaySonnet),
+            ("claude-cowork", sevenDayCowork),
+            ("claude-omelette", sevenDayOmelette),
+        ].compactMap { name, bucket in
+            guard let u = bucket?.utilization, u > 0 else { return nil }
+            return ModelUsage(modelName: name, messagesUsed: Int(u.rounded()))
         }
 
         return UsageData(
-            messagesUsed: messagesUsed ?? 0,
-            messagesLimit: messagesLimit ?? 0,
-            planName: plan.map { $0.capitalized } ?? "Unknown",
+            messagesUsed: Int(utilization.rounded()),
+            messagesLimit: 100,
+            planName: "Pro",
             periodResetDate: resetDate,
-            modelBreakdown: (models ?? []).map {
-                ModelUsage(modelName: $0.name ?? "Unknown", messagesUsed: $0.messages ?? 0)
-            },
+            modelBreakdown: modelBreakdown,
             lastUpdated: Date()
         )
     }
-}
 
-private struct UsageAPIModelEntry: Codable {
-    let name: String?
-    let messages: Int?
+    private func parseDate(_ string: String?) -> Date? {
+        guard let string else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: string) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
+    }
 }
