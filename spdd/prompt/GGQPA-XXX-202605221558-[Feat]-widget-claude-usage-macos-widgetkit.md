@@ -121,7 +121,7 @@ KeychainStore --> SessionCredentials : manages
 ### Create Xcode Project Structure
 1. Responsibility: Set up the multi-target Xcode project
 2. Targets:
-   - `ClaudeUsageWidgetApp` — macOS SwiftUI host app (macOS 13.0+)
+   - `ClaudeUsageWidgetApp` — macOS SwiftUI host app (macOS 26.0+)
    - `ClaudeUsageWidgetExtension` — WidgetKit App Extension
 3. Entitlements for both targets:
    - App Groups: `group.com.yourorg.claudeusagewidget`
@@ -246,7 +246,7 @@ KeychainStore --> SessionCredentials : manages
    - If `messagesLimit == 0`: show "Unlimited" SF Symbol (`infinity`) + used-count text in place of progress arc
    - `isStale: Bool` computed property — `true` when `Date().timeIntervalSince(usage.lastUpdated) > 1800`
    - `staleLabel` view — `Text("Stale data")` in `.tertiary` style; shown below plan badge when `isStale`
-   - Arc colour: `.accentColor` below 70 % usage, `.orange` 70–90 %, `.red` above 90 %
+   - Arc colour: `.tint` below 70 % usage, `.orange` 70–90 %, `.red` above 90 %
 
 3. `MediumWidgetView(usage: UsageData)` — `.systemMedium`
    - Layout: HStack — left column is `SmallWidgetView(usage:)`; right column contains a `ForEach` of up to 3 `ModelUsage` rows and a last-updated label
@@ -300,7 +300,7 @@ KeychainStore --> SessionCredentials : manages
 4. Supplementary text explaining how to obtain the session token from browser DevTools
 
 ## Norms
-1. Language & Frameworks: Swift 5.9+, SwiftUI, WidgetKit; macOS 13.0+ deployment target; zero third-party dependencies
+1. Language & Frameworks: Swift 5.9+, SwiftUI, WidgetKit; macOS 26.0+ deployment target; zero third-party dependencies
 2. App Groups: All shared persistent data uses `UserDefaults(suiteName: appGroupID)` or files in the App Group container; never `UserDefaults.standard` in the extension
 3. Keychain: Session credentials stored exclusively in the shared Keychain access group; `kSecAttrAccessible` set to `kSecAttrAccessibleAfterFirstUnlock` so the extension can read it
 4. Network: All requests via `URLSession`; 15-second request timeout; no persistent background tasks or `URLSession` background configuration in the extension
@@ -328,7 +328,7 @@ KeychainStore --> SessionCredentials : manages
    - App Group container stores only non-sensitive cached `UsageData` JSON
 4. Integration Constraints:
    - Both targets must declare matching App Group and Keychain Sharing entitlements; build will fail at runtime otherwise
-   - macOS 13.0+ required for WidgetKit on macOS; enforce via `MACOSX_DEPLOYMENT_TARGET`
+   - macOS 26.0+ required; enforce via `MACOSX_DEPLOYMENT_TARGET`
    - The `organizationId` field is optional; if empty the service must handle personal accounts (no org in the API path)
 5. Business Rule Constraints:
    - If `messagesLimit == 0`, display "Unlimited" and omit the progress arc
@@ -344,5 +344,5 @@ KeychainStore --> SessionCredentials : manages
    - Cache older than 24 hours treated as expired; display stale warning label
 8. Xcode Project Constraints:
    - Shared Swift files added to both targets via "Target Membership" checkboxes — no framework target required for MVP
-   - Minimum Xcode version: 15.0 (for macOS 14 SDK with latest WidgetKit APIs)
+   - Minimum Xcode version: 16.0 (for macOS 26 SDK with latest WidgetKit APIs)
    - Bundle ID of extension must be prefixed with the host app's bundle ID (e.g. `com.yourorg.claudeusagewidget.extension`)

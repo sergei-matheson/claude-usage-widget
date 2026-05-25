@@ -62,7 +62,7 @@ private struct ModelRowView: View {
                         .fill(.secondary.opacity(0.2))
                         .frame(height: 3)
                     Capsule()
-                        .fill(.accentColor)
+                        .fill(.tint)
                         .frame(width: geo.size.width * fraction, height: 3)
                 }
             }

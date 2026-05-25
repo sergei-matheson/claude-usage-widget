@@ -45,27 +45,21 @@ struct SmallWidgetView: View {
     }
 
     private var progressArc: some View {
-        Canvas { context, size in
-            let center = CGPoint(x: size.width / 2, y: size.height / 2)
-            let radius = min(size.width, size.height) / 2 - 4
-
-            var trackPath = Path()
-            trackPath.addArc(center: center, radius: radius,
-                             startAngle: .degrees(-90), endAngle: .degrees(270),
-                             clockwise: false)
-            context.stroke(trackPath, with: .color(.secondary.opacity(0.25)), lineWidth: 6)
-
-            guard usageFraction > 0 else { return }
-            var arcPath = Path()
-            arcPath.addArc(center: center, radius: radius,
-                           startAngle: .degrees(-90),
-                           endAngle: .degrees(-90 + 360 * usageFraction),
-                           clockwise: false)
-            let arcColor: Color = usageFraction > 0.9 ? .red : usageFraction > 0.7 ? .orange : .accentColor
-            context.stroke(arcPath, with: .color(arcColor),
-                           style: StrokeStyle(lineWidth: 6, lineCap: .round))
+        ZStack {
+            Circle()
+                .stroke(.secondary.opacity(0.25), lineWidth: 6)
+            if usageFraction > 0 {
+                ArcShape(fraction: usageFraction)
+                    .stroke(arcShading, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+            }
         }
         .frame(width: 52, height: 52)
+    }
+
+    private var arcShading: AnyShapeStyle {
+        if usageFraction > 0.9 { AnyShapeStyle(.red) }
+        else if usageFraction > 0.7 { AnyShapeStyle(.orange) }
+        else { AnyShapeStyle(.tint) }
     }
 
     private var usageText: some View {
@@ -100,6 +94,20 @@ struct SmallWidgetView: View {
         Text("Stale data")
             .font(.system(size: 9))
             .foregroundStyle(.tertiary)
+    }
+}
+
+private struct ArcShape: Shape {
+    let fraction: Double
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2 - 4
+        path.addArc(center: center, radius: radius,
+                    startAngle: .degrees(-90),
+                    endAngle: .degrees(-90 + 360 * fraction),
+                    clockwise: false)
+        return path
     }
 }
 

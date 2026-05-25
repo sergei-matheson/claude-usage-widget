@@ -3,13 +3,13 @@ name: ClaudeUsageWidget
 options:
   bundleIdPrefix: HR4LVL7TKY
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "26.0"
   createIntermediateGroups: true
 
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
     DEVELOPMENT_TEAM: HR4LVL7TKY
 
 targets:
@@ -17,12 +17,12 @@ targets:
   ClaudeUsageWidgetApp:
     type: application
     platform: macOS
-    deploymentTarget: "13.0"
+    deploymentTarget: "26.0"
     info:
       path: ClaudeUsageWidget/App/Info.plist
       properties:
         CFBundleDisplayName: Claude Usage Widget
-        LSMinimumSystemVersion: "13.0"
+        LSMinimumSystemVersion: "26.0"
         # URL scheme lets the widget deep-link into the app (ErrorView "Tap to retry")
         CFBundleURLTypes:
           - CFBundleURLSchemes:
@@ -52,7 +52,7 @@ targets:
   ClaudeUsageWidgetExtension:
     type: app-extension
     platform: macOS
-    deploymentTarget: "13.0"
+    deploymentTarget: "26.0"
     info:
       path: ClaudeUsageWidget/Widget/Info.plist
       properties:
