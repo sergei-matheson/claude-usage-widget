@@ -49,6 +49,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.sergei-matheson.claudeusagewidget
 
+  ClaudeUsageWidgetTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - ClaudeUsageWidgetTests
+      - path: ClaudeUsageWidget/Shared
+    dependencies:
+      - sdk: WidgetKit.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.sergei-matheson.claudeusagewidget.tests
+
   ClaudeUsageWidgetExtension:
     type: app-extension
     platform: macOS

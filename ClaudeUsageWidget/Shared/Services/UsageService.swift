@@ -62,12 +62,12 @@ struct UsageService {
     }
 }
 
-private struct UsageBucket: Codable {
+struct UsageBucket: Codable {
     let utilization: Double?
     let resetsAt: String?
 }
 
-private struct UsageAPIResponse: Codable {
+struct UsageAPIResponse: Codable {
     let fiveHour: UsageBucket?
     let sevenDay: UsageBucket?
 
