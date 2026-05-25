@@ -7,7 +7,6 @@ struct UsageData: Codable, Equatable {
     let periodResetDate: Date
     let sevenDayUtilization: Int
     let sevenDayResetDate: Date
-    let modelBreakdown: [ModelUsage]
     let lastUpdated: Date
 
     static func placeholder() -> UsageData {
@@ -18,7 +17,6 @@ struct UsageData: Codable, Equatable {
             periodResetDate: Date().addingTimeInterval(3600 * 3),
             sevenDayUtilization: 18,
             sevenDayResetDate: Date().addingTimeInterval(86400 * 5),
-            modelBreakdown: [],
             lastUpdated: Date()
         )
     }

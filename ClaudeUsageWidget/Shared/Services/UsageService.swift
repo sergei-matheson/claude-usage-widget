@@ -70,25 +70,10 @@ private struct UsageBucket: Codable {
 private struct UsageAPIResponse: Codable {
     let fiveHour: UsageBucket?
     let sevenDay: UsageBucket?
-    let sevenDayOpus: UsageBucket?
-    let sevenDaySonnet: UsageBucket?
-    let sevenDayCowork: UsageBucket?
-    let sevenDayOmelette: UsageBucket?
 
     func toUsageData() -> UsageData {
         let utilization = fiveHour?.utilization ?? 0
         let resetDate = parseDate(fiveHour?.resetsAt) ?? Date().addingTimeInterval(3600 * 5)
-
-        let modelBreakdown: [ModelUsage] = [
-            ("claude-opus", sevenDayOpus),
-            ("claude-sonnet", sevenDaySonnet),
-            ("claude-cowork", sevenDayCowork),
-            ("claude-omelette", sevenDayOmelette),
-        ].compactMap { name, bucket in
-            guard let u = bucket?.utilization, u > 0 else { return nil }
-            return ModelUsage(modelName: name, messagesUsed: Int(u.rounded()))
-        }
-
         let sevenDayUtilization = sevenDay?.utilization ?? 0
         let sevenDayResetDate = parseDate(sevenDay?.resetsAt) ?? Date().addingTimeInterval(86400 * 7)
 
@@ -99,7 +84,6 @@ private struct UsageAPIResponse: Codable {
             periodResetDate: resetDate,
             sevenDayUtilization: Int(sevenDayUtilization.rounded()),
             sevenDayResetDate: sevenDayResetDate,
-            modelBreakdown: modelBreakdown,
             lastUpdated: Date()
         )
     }
