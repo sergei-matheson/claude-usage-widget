@@ -13,13 +13,9 @@ class UsageData {
     +Int messagesLimit
     +String planName
     +Date periodResetDate
-    +[ModelUsage] modelBreakdown
+    +Int sevenDayUtilization
+    +Date sevenDayResetDate
     +Date lastUpdated
-}
-
-class ModelUsage {
-    +String modelName
-    +Int messagesUsed
 }
 
 class UsageEntry {
@@ -56,7 +52,6 @@ class KeychainStore {
     +delete() throws
 }
 
-UsageData "1" -- "*" ModelUsage : contains
 UsageEntry --> UsageData : holds
 UsageEntry --> EntryState : describes state
 UsageProvider --> UsageService : calls
@@ -81,15 +76,20 @@ KeychainStore --> SessionCredentials : manages
 
 3. Data Fetching:
    - `UsageService` makes authenticated HTTPS requests to the claude.ai internal usage API endpoint (identified by inspecting network traffic on `https://claude.ai/settings/usage`)
-   - JSON response parsed into `UsageData` via `Codable`; intermediate `UsageAPIResponse` type absorbs API schema changes gracefully using optional fields
+   - The API returns utilization percentages (0–100) for named time windows (`five_hour`, `seven_day`), not raw message counts; each bucket has a `utilization: Double` and `resets_at: String?` field
+   - `resets_at` uses ISO 8601 with fractional seconds (e.g. `2026-05-25T10:00:01.174634+00:00`); date parsing must try `.withFractionalSeconds` before falling back to standard format
+   - JSON response parsed via `Codable` using two internal types: `UsageBucket` (single time-window entry) and `UsageAPIResponse` (top-level container with `fiveHour` and `sevenDay` buckets)
+   - `UsageBucket` and `UsageAPIResponse` are `internal` (not `private`) to allow direct testing without host-app imports
+   - `UsageAPIResponse.toUsageData()` maps utilization percentage to `messagesUsed` (Int, rounded) with `messagesLimit` fixed at 100; `planName` is always "Pro" as the API does not return plan information
    - Last successful `UsageData` cached as JSON in the shared App Group container so the widget shows stale-but-labelled data on network failure
    - `URLSession` with a 15-second timeout; no persistent background tasks in the extension
 
 4. Display Strategy:
    - SwiftUI views for `.systemSmall` and `.systemMedium` widget families
-   - Small: circular progress arc (messages used / limit), plan badge, days-to-reset countdown
-   - Medium: same as small plus per-model breakdown list (up to 3 rows) and last-updated timestamp
+   - Small: circular progress arc (5-hour utilization %), plan badge, time-to-reset countdown (hours/minutes/days)
+   - Medium: left column is `SmallWidgetView`; right column shows 7-day utilization progress bar with its own reset countdown and last-updated timestamp
    - Distinct placeholder views for unauthenticated and error states with actionable copy
+   - All widget views apply `.containerBackground(for: .widget) { Color.clear }` as required by WidgetKit on macOS 14+
 
 ## Structure
 
@@ -104,10 +104,10 @@ KeychainStore --> SessionCredentials : manages
 ### Dependencies
 1. `UsageProvider` depends on `UsageService` (data fetching) and `KeychainStore` (credential access)
 2. `ClaudeUsageWidget` declares `UsageProvider` as its `TimelineProvider`
-3. `WidgetEntryView` receives `UsageEntry`; dispatches on `entry.state` first, then `widgetFamily`; passes `UsageData` directly to content views
+3. `WidgetEntryView` receives `UsageEntry`; dispatches on `entry.state` first, then `widgetFamily`; passes `UsageData` directly to content views; applies `.containerBackground(for: .widget) { Color.clear }` to its root view
 4. `SmallWidgetView` and `MediumWidgetView` accept `usage: UsageData` (not `UsageEntry`) — state handling is the responsibility of `WidgetEntryView`
-5. `MediumWidgetView` owns a private `ModelRowView(model: ModelUsage, limit: Int)` — not a top-level component
-5. Host app `SettingsView` writes `SessionCredentials` via `KeychainStore` and calls `WidgetCenter.shared.reloadAllTimelines()`
+5. `MediumWidgetView` owns a private `SevenDayRowView(usage: UsageData)` displaying 7-day utilization — not a top-level component
+6. Host app `SettingsView` writes `SessionCredentials` via `KeychainStore` and calls `WidgetCenter.shared.reloadAllTimelines()`
 
 ### Layered Architecture
 1. Widget Presentation Layer: `WidgetEntryView`, `SmallWidgetView`, `MediumWidgetView`, `UnauthenticatedView`, `ErrorView` — pure SwiftUI rendering of `UsageEntry`
@@ -119,36 +119,31 @@ KeychainStore --> SessionCredentials : manages
 ## Operations
 
 ### Create Xcode Project Structure
-1. Responsibility: Set up the multi-target Xcode project
+1. Responsibility: Set up the multi-target Xcode project using XcodeGen (`project.yml`)
 2. Targets:
    - `ClaudeUsageWidgetApp` — macOS SwiftUI host app (macOS 26.0+)
    - `ClaudeUsageWidgetExtension` — WidgetKit App Extension
-3. Entitlements for both targets:
+   - `ClaudeUsageWidgetTests` — unit test bundle; sources include `ClaudeUsageWidgetTests/` and `ClaudeUsageWidget/Shared/`; depends on `WidgetKit.framework`
+3. Entitlements for app and extension targets:
    - App Groups: `group.com.yourorg.claudeusagewidget`
    - Keychain Sharing: `com.yourorg.claudeusagewidget`
-4. Shared source files added to both targets: `UsageData.swift`, `ModelUsage.swift`, `SessionCredentials.swift`, `KeychainStore.swift`, `UsageService.swift`, `UsageCache.swift`
+4. Shared source files added to both app and extension targets: `UsageData.swift`, `SessionCredentials.swift`, `KeychainStore.swift`, `UsageService.swift`, `UsageCache.swift`, `UsageEntry.swift`, `EntryState.swift`
 
 ### Create Model — UsageData
 1. Responsibility: Value type for a Claude usage snapshot
 2. Attributes:
-   - `messagesUsed`: Int — messages consumed in current billing period
-   - `messagesLimit`: Int — plan message cap (0 = unlimited)
-   - `planName`: String — e.g. "Pro", "Team", "Free"
-   - `periodResetDate`: Date — when the usage counter resets
-   - `modelBreakdown`: [ModelUsage] — per-model counts; may be empty
+   - `messagesUsed`: Int — 5-hour utilization percentage (0–100), rounded from API `utilization` Double
+   - `messagesLimit`: Int — always 100 (utilization is a percentage; no raw count available from API)
+   - `planName`: String — always "Pro" (API does not return plan information)
+   - `periodResetDate`: Date — when the 5-hour usage window resets (from `five_hour.resets_at`)
+   - `sevenDayUtilization`: Int — 7-day utilization percentage (0–100), rounded
+   - `sevenDayResetDate`: Date — when the 7-day usage window resets (from `seven_day.resets_at`)
    - `lastUpdated`: Date — when this snapshot was fetched
 3. Conformances: `Codable`, `Equatable`
 4. Static factory: `static func placeholder() -> UsageData` returning representative dummy values for widget previews
 5. Coding helpers (extensions co-located in `UsageData.swift`, shared between both targets):
    - `JSONDecoder.usageDecoder` — `keyDecodingStrategy: .convertFromSnakeCase`, `dateDecodingStrategy: .iso8601`; used by `UsageService` to parse API responses and by `UsageCache` to read the cache
    - `JSONEncoder.usageEncoder` — `dateEncodingStrategy: .iso8601`; used by `UsageCache` to write the cache
-
-### Create Model — ModelUsage
-1. Responsibility: Per-model usage breakdown entry
-2. Attributes:
-   - `modelName`: String — e.g. "claude-opus-4-7", "claude-sonnet-4-6"
-   - `messagesUsed`: Int
-3. Conformances: `Codable`, `Equatable`
 
 ### Create Model — UsageEntry
 1. Responsibility: WidgetKit timeline entry wrapping usage state
@@ -203,13 +198,17 @@ KeychainStore --> SessionCredentials : manages
    - `session`: URLSession — configured with 15-second timeout
 3. Method: `func fetchUsage(credentials: SessionCredentials) async throws -> UsageData`
    - Logic:
-     1. Build URL: `https://claude.ai/api/organizations/<organizationId>/usage` or the endpoint observed in browser network inspector on the usage settings page (fallback: parse `https://claude.ai/settings/usage` page JSON embed)
+     1. Build URL: `https://claude.ai/api/usage` for personal accounts, or `https://claude.ai/api/organizations/<organizationId>/usage` when `organizationId` is non-empty
      2. Set request headers: `Cookie: sessionKey=<value>`, `User-Agent: ClaudeUsageWidget/1.0 macOS`, `Accept: application/json`
-     3. Perform `URLSession.data(for:delegate:)` with 15s timeout
+     3. Perform `URLSession.data(for:)` with 15s timeout
      4. Check HTTP status: throw `UsageServiceError.unauthenticated` on 401/403
-     5. Decode response via `JSONDecoder` into `UsageAPIResponse` (all fields optional)
-     6. Map `UsageAPIResponse` → `UsageData`; return
-4. Intermediate type `UsageAPIResponse`: `Codable` struct with all optional fields mirroring the observed API JSON shape; guards against API schema changes
+     5. Decode response via `JSONDecoder.usageDecoder` into `UsageAPIResponse`
+     6. Call `UsageAPIResponse.toUsageData()` and return
+4. Internal types (not `private`; must be accessible to the test target which compiles the Shared sources directly):
+   - `UsageBucket`: Codable struct with `utilization: Double?` and `resetsAt: String?`
+   - `UsageAPIResponse`: Codable struct with `fiveHour: UsageBucket?` and `sevenDay: UsageBucket?`; unknown top-level API keys (e.g. `tangelo`, `iguana_necktie`) are silently ignored by the synthesised decoder
+   - `UsageAPIResponse.toUsageData()` internal method: maps `fiveHour.utilization` → `messagesUsed` (rounded Int), `sevenDay.utilization` → `sevenDayUtilization`, parses `resets_at` strings manually using `ISO8601DateFormatter` trying `.withFractionalSeconds` first then standard format; falls back to `now + 5h` / `now + 7d` when the field is nil or unparseable; `planName` is always "Pro"
+   - `UsageAPIResponse.parseDate(_ string: String?) -> Date?` private helper: creates `ISO8601DateFormatter` with `[.withInternetDateTime, .withFractionalSeconds]`; on failure retries with `[.withInternetDateTime]`
 5. Error type: `UsageServiceError` enum — `.unauthenticated`, `.networkError(Error)`, `.decodingError(Error)`, `.unexpectedResponse(Int)`
 
 ### Create — UsageProvider (TimelineProvider)
@@ -233,7 +232,8 @@ KeychainStore --> SessionCredentials : manages
 
 ### Create SwiftUI Widget Views
 1. `WidgetEntryView` — root view with two-level dispatch
-   - First dispatches on `entry.state`:
+   - Extracts state dispatch into a `@ViewBuilder var widgetContent` computed property to allow attaching `.containerBackground(for: .widget) { Color.clear }` to the root `body`
+   - `widgetContent` dispatches on `entry.state`:
      - `.unauthenticated` → `UnauthenticatedView()` (short-circuit, no family check)
      - `.error(message)` → `ErrorView(message:)` (short-circuit, no family check)
      - `.loaded` → unwrap `entry.usageData`; if nil fall back to `ErrorView("No data available")`
@@ -242,18 +242,20 @@ KeychainStore --> SessionCredentials : manages
      - default → `SmallWidgetView(usage:)` (covers `.systemSmall` and any future families)
 
 2. `SmallWidgetView(usage: UsageData)` — `.systemSmall`
-   - Layout: VStack with circular progress arc (`Canvas`-drawn arc), usage fraction text, plan badge, days-to-reset label
+   - Layout: VStack with circular progress arc (shape-based), usage fraction text (e.g. "21/100"), plan badge, time-to-reset label
    - If `messagesLimit == 0`: show "Unlimited" SF Symbol (`infinity`) + used-count text in place of progress arc
    - `isStale: Bool` computed property — `true` when `Date().timeIntervalSince(usage.lastUpdated) > 1800`
    - `staleLabel` view — `Text("Stale data")` in `.tertiary` style; shown below plan badge when `isStale`
-   - Arc colour: `.tint` below 70 % usage, `.orange` 70–90 %, `.red` above 90 %
+   - Arc colour: `.tint` below 70 % usage, `.orange` 70–90 %, `.red` above 90 %; implemented via `AnyShapeStyle` wrapper (required because `.tint` is a `ShapeStyle`, not a `Color`, and cannot be used in `Canvas` drawing contexts)
+   - Progress arc drawn using a custom `ArcShape: Shape` struct (not `Canvas`); `ArcShape` takes a `fraction: Double` and draws via `path.addArc` from `-90°` to `-90° + 360° × fraction`
+   - `timeUntilReset: String` computed property: if `periodResetDate > now`, inspects day/hour/minute components — returns "Resets in Xd" when days > 0, "Resets in Xh" when hours > 0, otherwise "Resets in Xm" (minimum 1); returns "Resetting…" when date is in the past
 
 3. `MediumWidgetView(usage: UsageData)` — `.systemMedium`
-   - Layout: HStack — left column is `SmallWidgetView(usage:)`; right column contains a `ForEach` of up to 3 `ModelUsage` rows and a last-updated label
-   - Each model row is a private `ModelRowView(model: ModelUsage, limit: Int)` struct:
-     - Row: `HStack` with model display name (short form, e.g. "Sonnet 4.6") and message count
-     - Mini `Capsule` progress bar below the label, proportional to `model.messagesUsed / limit`; omitted when `limit == 0`
-     - Display name derived by stripping `claude-` prefix and capitalising first segment
+   - Layout: HStack — left column is `SmallWidgetView(usage:)` (showing 5-hour window); right column contains `SevenDayRowView(usage:)` and a last-updated label
+   - Private `SevenDayRowView(usage: UsageData)` struct:
+     - Header row: `HStack` with "7-day" label (`.primary`) and `"\(sevenDayUtilization)%"` value (`.primary`, monospaced digit)
+     - `Capsule` progress bar proportional to `sevenDayUtilization / 100`; `.tint` fill
+     - Reset countdown label using same day/hour logic as `SmallWidgetView.timeUntilReset` (applied to `sevenDayResetDate`)
 
 4. `UnauthenticatedView` — state: `.unauthenticated`
    - Text: "Open Claude Widget\nto sign in"
@@ -266,21 +268,7 @@ KeychainStore --> SessionCredentials : manages
 
 ### Create ClaudeUsageWidget (Widget Entry Point)
 1. Responsibility: Widget bundle declaration
-2. Implementation:
-   ```swift
-   @main
-   struct ClaudeUsageWidget: Widget {
-       let kind = "ClaudeUsageWidget"
-       var body: some WidgetConfiguration {
-           StaticConfiguration(kind: kind, provider: UsageProvider()) { entry in
-               WidgetEntryView(entry: entry)
-           }
-           .configurationDisplayName("Claude Usage")
-           .description("Shows your Claude message usage and plan status.")
-           .supportedFamilies([.systemSmall, .systemMedium])
-       }
-   }
-   ```
+2. Declare `@main struct ClaudeUsageWidget: Widget` with `kind = "ClaudeUsageWidget"`, `StaticConfiguration` using `UsageProvider`, `WidgetEntryView`, display name "Claude Usage", and `supportedFamilies([.systemSmall, .systemMedium])`
 
 ### Create Host App — SettingsView
 1. Responsibility: Allow the user to enter and persist their claude.ai session token
@@ -299,9 +287,22 @@ KeychainStore --> SessionCredentials : manages
    - Clear button: `KeychainStore().delete()` + `WidgetCenter.shared.reloadAllTimelines()`
 4. Supplementary text explaining how to obtain the session token from browser DevTools
 
+### Create Unit Tests
+1. Responsibility: Verify JSON parsing and data mapping in `UsageService`
+2. Target: `ClaudeUsageWidgetTests` — unit test bundle that compiles `ClaudeUsageWidget/Shared/` source files directly (no `@testable import`; shared types are accessible within the same compilation unit)
+3. Test class: `UsageServiceTests: XCTestCase`
+4. Test cases:
+   - `testParsesUtilizationValues` — decode full response JSON matching the real API shape; assert `messagesUsed == 15`, `messagesLimit == 100`, `sevenDayUtilization == 2`
+   - `testRoundsUtilizationToNearestInt` — decode JSON with fractional utilization values (e.g. 15.6, 2.4); assert correct rounding
+   - `testParsesFractionalSecondsResetDate` — verify that `resets_at` strings with fractional seconds (e.g. `"2026-05-25T10:00:01.174634+00:00"`) produce the correct `periodResetDate` rather than falling back to the default
+   - `testFallsBackWhenFiveHourMissing` — decode JSON with no `five_hour` key; assert `messagesUsed == 0` and `periodResetDate ≈ now + 5h`
+   - `testFallsBackWhenResetDateIsNull` — decode JSON where `resets_at` is null in both buckets; assert both reset dates fall back to appropriate defaults
+   - `testIgnoresUnknownTopLevelKeys` — decode JSON containing unknown keys (`tangelo`, `iguana_necktie`); assert no decode error is thrown
+   - `testPlanNameIsPro` — assert `planName == "Pro"` regardless of response content
+
 ## Norms
 1. Language & Frameworks: Swift 5.9+, SwiftUI, WidgetKit; macOS 26.0+ deployment target; zero third-party dependencies
-2. App Groups: All shared persistent data uses `UserDefaults(suiteName: appGroupID)` or files in the App Group container; never `UserDefaults.standard` in the extension
+2. App Groups: All shared persistent data uses files in the App Group container; never `UserDefaults.standard` in the extension
 3. Keychain: Session credentials stored exclusively in the shared Keychain access group; `kSecAttrAccessible` set to `kSecAttrAccessibleAfterFirstUnlock` so the extension can read it
 4. Network: All requests via `URLSession`; 15-second request timeout; no persistent background tasks or `URLSession` background configuration in the extension
 5. Error Handling: All error paths in `getTimeline` must produce a valid `UsageEntry`; no unhandled throws; widget must never crash regardless of network or credential state
@@ -311,6 +312,8 @@ KeychainStore --> SessionCredentials : manages
 9. Shared Source Files: Files shared between app and extension targets use no `#if` target guards; they must compile cleanly in both contexts
 10. Comments: Only for non-obvious constraints (e.g. WidgetKit network budget, Keychain access group requirements, undocumented API endpoints)
 11. JSON Coding: Use `JSONDecoder.usageDecoder` and `JSONEncoder.usageEncoder` (defined as static extensions in `UsageData.swift`) for all domain model serialisation; never instantiate standalone decoders/encoders inline for domain types
+12. Widget Background: All widget entry views must apply `.containerBackground(for: .widget) { Color.clear }` at the root body level; this is required by WidgetKit on macOS 14+ and must not be omitted
+13. Testability: Internal types that are logic-bearing and shared across the `ClaudeUsageWidget/Shared/` folder should be declared `internal` (not `private`) when they need to be accessed by the test target; `private` is acceptable only for file-local implementation details that carry no independent logic
 
 ## Safeguards
 1. Functional Constraints:
@@ -335,7 +338,9 @@ KeychainStore --> SessionCredentials : manages
    - If `periodResetDate` is in the past, show "Resetting…" instead of a countdown and trigger a timeline reload
    - Widget must distinguish `.unauthenticated` (no credentials) from `.error` (credentials present but fetch failed)
 6. API Constraints:
-   - The claude.ai usage endpoint is undocumented; all JSON fields in `UsageAPIResponse` must be optional with sensible defaults to survive schema changes
+   - The claude.ai usage API returns utilization percentages (0–100) for named time windows; it does not return raw message counts, per-model breakdowns, or plan names
+   - The API response contains known top-level keys (`five_hour`, `seven_day`) and undocumented keys that must be silently ignored; `UsageAPIResponse` must declare only the fields it uses
+   - `resets_at` timestamps use ISO 8601 with fractional seconds; parsing must use `ISO8601DateFormatter` with `.withFractionalSeconds` option, not the standard `.iso8601` `DateDecodingStrategy` (which does not support fractional seconds)
    - `User-Agent` header must identify the widget: `ClaudeUsageWidget/1.0 macOS`
    - Handle HTTP 429 (rate limit) by extending next refresh to 60 minutes and returning cached data
 7. Data Constraints:
@@ -343,6 +348,7 @@ KeychainStore --> SessionCredentials : manages
    - Cache file written atomically using `Data.write(to:options:.atomic)` to prevent corrupt reads
    - Cache older than 24 hours treated as expired; display stale warning label
 8. Xcode Project Constraints:
-   - Shared Swift files added to both targets via "Target Membership" checkboxes — no framework target required for MVP
+   - Shared Swift files added to both app and extension targets via "Target Membership" — no framework target required for MVP
    - Minimum Xcode version: 16.0 (for macOS 26 SDK with latest WidgetKit APIs)
    - Bundle ID of extension must be prefixed with the host app's bundle ID (e.g. `com.yourorg.claudeusagewidget.extension`)
+   - Test target (`ClaudeUsageWidgetTests`) compiles Shared sources directly; it must not be set as the extension's test host
