@@ -61,6 +61,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.sergei-matheson.claudeusagewidget.tests
+        GENERATE_INFOPLIST_FILE: YES
 
   ClaudeUsageWidgetExtension:
     type: app-extension
