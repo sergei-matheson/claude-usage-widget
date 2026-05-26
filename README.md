@@ -11,9 +11,22 @@ A macOS widget that shows your [Claude.ai](https://claude.ai) usage at a glance.
 
 ## Setup
 
-### 1. Build and run
+### 1. Build and install
 
-Open `ClaudeUsageWidget.xcodeproj` in Xcode and press **⌘R**.
+Open `ClaudeUsageWidget.xcodeproj` in Xcode and press **⌘B** to build, then copy the app to `/Applications`:
+
+```
+cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeUsageWidget-*/Build/Products/Debug/ClaudeUsageWidgetApp.app /Applications/
+```
+
+Then clear the quarantine flag and register the widget extension:
+
+```
+xattr -dr com.apple.quarantine /Applications/ClaudeUsageWidgetApp.app
+pluginkit -e use -i io.github.sergei-matheson.claudeusagewidget.extension
+```
+
+Open the app from `/Applications`.
 
 ### 2. Enter your session token
 
