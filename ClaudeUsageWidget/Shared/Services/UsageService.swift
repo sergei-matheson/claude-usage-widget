@@ -10,12 +10,19 @@ enum UsageServiceError: Error {
 struct UsageService {
     // The claude.ai usage endpoint is undocumented. Verify the exact path by inspecting
     // network traffic on https://claude.ai/settings/usage before shipping.
-    private let session: URLSession = {
+    private let session: URLSession
+
+    init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 15
-        return URLSession(configuration: config)
-    }()
+        self.session = URLSession(configuration: config)
+    }
+
+    // Internal init for testing — allows injecting a mock URLSession
+    init(session: URLSession) {
+        self.session = session
+    }
 
     func fetchUsage(credentials: SessionCredentials) async throws -> UsageData {
         let url = buildURL(credentials: credentials)
