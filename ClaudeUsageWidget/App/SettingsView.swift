@@ -49,8 +49,17 @@ struct SettingsView: View {
     }
 
     private func saveCredentials() {
-        guard !sessionToken.isEmpty else { return }
-        let credentials = SessionCredentials(sessionKey: sessionToken, organizationId: organizationId)
+        let trimmedToken = sessionToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedOrg = organizationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedToken.isEmpty else { return }
+
+        if !trimmedOrg.isEmpty,
+           (try? UsageService.organizationIdPattern.wholeMatch(in: trimmedOrg)) == nil {
+            statusMessage = "Organization ID must be alphanumeric (with dashes)."
+            return
+        }
+
+        let credentials = SessionCredentials(sessionKey: trimmedToken, organizationId: trimmedOrg)
         do {
             try keychain.save(credentials)
             WidgetCenter.shared.reloadAllTimelines()
