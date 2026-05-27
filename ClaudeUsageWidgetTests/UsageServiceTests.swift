@@ -15,16 +15,12 @@ final class UsageServiceTests: XCTestCase {
         "utilization": 2.0,
         "resets_at": "2026-05-31T01:00:01.174660+00:00"
       },
-      "seven_day_oauth_apps": null,
-      "seven_day_opus": null,
-      "seven_day_sonnet": null,
       "extra_usage": { "is_enabled": false }
     }
     """
 
     func testParsesUtilizationValues() throws {
         let usage = try UsageService.parse(data: makeData(fullResponseJSON))
-
         XCTAssertEqual(usage.fiveHourUtilization, 15)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
     }
@@ -37,7 +33,6 @@ final class UsageServiceTests: XCTestCase {
         }
         """
         let usage = try UsageService.parse(data: makeData(json))
-
         XCTAssertEqual(usage.fiveHourUtilization, 16)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
     }
@@ -52,22 +47,29 @@ final class UsageServiceTests: XCTestCase {
         let expected = Calendar(identifier: .gregorian).date(from: components)!
 
         let parsed = try XCTUnwrap(usage.periodResetDate)
-        XCTAssertEqual(parsed.timeIntervalSince1970,
-                       expected.timeIntervalSince1970,
-                       accuracy: 1.0)
+        XCTAssertEqual(parsed.timeIntervalSince1970, expected.timeIntervalSince1970, accuracy: 1.0)
     }
 
-    func testFallsBackWhenFiveHourMissing() throws {
+    func testParsesDateWithoutFractionalSeconds() throws {
         let json = """
-        { "seven_day": { "utilization": 5.0, "resets_at": null } }
+        {
+          "five_hour": { "utilization": 5.0, "resets_at": "2026-05-25T10:00:01+00:00" },
+          "seven_day": { "utilization": 1.0, "resets_at": null }
+        }
         """
         let usage = try UsageService.parse(data: makeData(json))
-
-        XCTAssertEqual(usage.fiveHourUtilization, 0)
-        XCTAssertNil(usage.periodResetDate)
+        XCTAssertNotNil(usage.periodResetDate)
     }
 
-    func testResetDatesAreNilWhenAPIReturnsNull() throws {
+    func testReturnsNilDatesWhenBucketsMissing() throws {
+        let usage = try UsageService.parse(data: makeData("{}"))
+        XCTAssertEqual(usage.fiveHourUtilization, 0)
+        XCTAssertEqual(usage.sevenDayUtilization, 0)
+        XCTAssertNil(usage.periodResetDate)
+        XCTAssertNil(usage.sevenDayResetDate)
+    }
+
+    func testReturnsNilDatesWhenAPIReturnsNullDateFields() throws {
         let json = """
         {
           "five_hour": { "utilization": 10.0, "resets_at": null },
@@ -75,22 +77,27 @@ final class UsageServiceTests: XCTestCase {
         }
         """
         let usage = try UsageService.parse(data: makeData(json))
-
         XCTAssertNil(usage.periodResetDate)
         XCTAssertNil(usage.sevenDayResetDate)
     }
 
-    func testIgnoresUnknownTopLevelKeys() throws {
-        // Extra keys like tangelo, iguana_necktie should not cause a decode failure
+    func testIgnoresUnknownTopLevelKeys() {
         let json = """
         {
           "five_hour": { "utilization": 20.0, "resets_at": null },
           "tangelo": null,
-          "iguana_necktie": null,
-          "omelette_promotional": null
+          "iguana_necktie": null
         }
         """
         XCTAssertNoThrow(try UsageService.parse(data: makeData(json)))
+    }
+
+    func testParseWrapsMalformedPayloadAsDecodingError() {
+        XCTAssertThrowsError(try UsageService.parse(data: makeData("not-json"))) { error in
+            guard case UsageServiceError.decodingError = error else {
+                return XCTFail("expected .decodingError, got \(error)")
+            }
+        }
     }
 
     // MARK: - buildURL
@@ -107,18 +114,76 @@ final class UsageServiceTests: XCTestCase {
             sessionKey: "k",
             organizationId: "1a2b3c4d-5e6f-7890-abcd-ef0123456789"
         ))
-        XCTAssertEqual(
-            url?.absoluteString,
-            "https://claude.ai/api/organizations/1a2b3c4d-5e6f-7890-abcd-ef0123456789/usage"
-        )
+        XCTAssertEqual(url?.absoluteString, "https://claude.ai/api/organizations/1a2b3c4d-5e6f-7890-abcd-ef0123456789/usage")
     }
 
-    func testBuildURLRejectsPathTraversal() {
+    func testBuildURLRejectsInvalidOrgIdCharacters() {
         let service = UsageService()
         XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "../me")))
         XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo/bar")))
         XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo bar")))
         XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo#frag")))
         XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo?q=1")))
+    }
+
+    func testBuildURLRejectsTooLongOrgId() {
+        let service = UsageService()
+        let tooLong = String(repeating: "a", count: 65)
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: tooLong)))
+    }
+
+    // MARK: - parseRetryAfter
+
+    func testParseRetryAfterTrimsWhitespace() {
+        let response = HTTPURLResponse(
+            url: URL(string: "https://claude.ai")!,
+            statusCode: 429,
+            httpVersion: nil,
+            headerFields: ["Retry-After": " 120 "]
+        )!
+        XCTAssertEqual(UsageService.parseRetryAfter(response), 120)
+    }
+
+    func testParseRetryAfterRejectsZeroAndNegative() {
+        let zero = HTTPURLResponse(
+            url: URL(string: "https://claude.ai")!,
+            statusCode: 429,
+            httpVersion: nil,
+            headerFields: ["Retry-After": "0"]
+        )!
+        XCTAssertNil(UsageService.parseRetryAfter(zero))
+
+        let negative = HTTPURLResponse(
+            url: URL(string: "https://claude.ai")!,
+            statusCode: 429,
+            httpVersion: nil,
+            headerFields: ["Retry-After": "-1"]
+        )!
+        XCTAssertNil(UsageService.parseRetryAfter(negative))
+    }
+}
+
+final class EntryStateAndUsageEntryTests: XCTestCase {
+    func testEntryStateEquality() {
+        XCTAssertEqual(EntryState.loaded, .loaded)
+        XCTAssertEqual(EntryState.unauthenticated, .unauthenticated)
+        XCTAssertEqual(EntryState.error("oops"), .error("oops"))
+        XCTAssertNotEqual(EntryState.error("a"), .error("b"))
+        XCTAssertNotEqual(EntryState.loaded, .unauthenticated)
+    }
+
+    func testUsageEntryPlaceholderHasLoadedStateAndData() {
+        let entry = UsageEntry.placeholder()
+        XCTAssertEqual(entry.state, .loaded)
+        XCTAssertNotNil(entry.usageData)
+    }
+
+    func testUsageEntryFactoriesSetExpectedState() {
+        XCTAssertEqual(UsageEntry.unauthenticated().state, .unauthenticated)
+        XCTAssertNil(UsageEntry.unauthenticated().usageData)
+
+        let errorEntry = UsageEntry.error("Network failed")
+        XCTAssertEqual(errorEntry.state, .error("Network failed"))
+        XCTAssertNil(errorEntry.usageData)
     }
 }
