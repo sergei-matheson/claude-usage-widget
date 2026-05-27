@@ -11,6 +11,10 @@ settings:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     DEVELOPMENT_TEAM: HR4LVL7TKY
+    DEAD_CODE_STRIPPING: YES
+    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    STRING_CATALOG_GENERATE_SYMBOLS: YES
 
 targets:
 
@@ -48,6 +52,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.sergei-matheson.claudeusagewidget
+        REGISTER_APP_GROUPS: YES
 
   ClaudeUsageWidgetTests:
     type: bundle.unit-test
@@ -89,3 +94,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.sergei-matheson.claudeusagewidget.extension
+        REGISTER_APP_GROUPS: YES

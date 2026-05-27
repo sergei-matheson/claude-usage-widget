@@ -1,37 +1,40 @@
 import Foundation
 import Security
 
-enum KeychainError: Error {
+enum KeychainError: Error, Equatable {
     case notFound
     case unexpectedData
     case unhandledError(OSStatus)
 }
 
 struct KeychainStore {
-    // Must match the Keychain Sharing entitlement in both targets
-    private let service = "io.github.sergei-matheson.claudeusagewidget.session"
-    // $(AppIdentifierPrefix) expands to TeamID + "." at build time, so the runtime value is HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget
-    private let accessGroup = "HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget"
+    private let service: String
+    private let accessGroup: String?
+
+    // Production init — uses the shared access group so both the app and widget extension can read credentials
+    init() {
+        // Must match the Keychain Sharing entitlement in both targets
+        self.service = "io.github.sergei-matheson.claudeusagewidget.session"
+        // $(AppIdentifierPrefix) expands to TeamID + "." at build time, so the runtime value is HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget
+        self.accessGroup = "HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget"
+    }
+
+    // Internal init for testing — pass a unique service name and omit the access group so tests run in the sandbox
+    init(service: String, accessGroup: String? = nil) {
+        self.service = service
+        self.accessGroup = accessGroup
+    }
 
     func save(_ credentials: SessionCredentials) throws {
         let data = try JSONEncoder().encode(credentials)
 
-        let updateQuery: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccessGroup: accessGroup
-        ]
-        let updateStatus = SecItemUpdate(updateQuery as CFDictionary, [kSecValueData: data] as CFDictionary)
+        let updateStatus = SecItemUpdate(baseQuery() as CFDictionary, [kSecValueData: data] as CFDictionary)
 
         if updateStatus == errSecItemNotFound {
-            let addQuery: [CFString: Any] = [
-                kSecClass: kSecClassGenericPassword,
-                kSecAttrService: service,
-                kSecAttrAccessGroup: accessGroup,
-                kSecValueData: data,
-                // kSecAttrAccessibleAfterFirstUnlock allows the extension to read even before user unlock
-                kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlock
-            ]
+            var addQuery = baseQuery()
+            addQuery[kSecValueData] = data
+            // kSecAttrAccessibleAfterFirstUnlock allows the extension to read even before user unlock
+            addQuery[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlock
             let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
             guard addStatus == errSecSuccess else {
                 throw KeychainError.unhandledError(addStatus)
@@ -42,13 +45,9 @@ struct KeychainStore {
     }
 
     func load() throws -> SessionCredentials {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccessGroup: accessGroup,
-            kSecReturnData: true,
-            kSecMatchLimit: kSecMatchLimitOne
-        ]
+        var query = baseQuery()
+        query[kSecReturnData] = true
+        query[kSecMatchLimit] = kSecMatchLimitOne
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -61,14 +60,20 @@ struct KeychainStore {
     }
 
     func delete() throws {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccessGroup: accessGroup
-        ]
-        let status = SecItemDelete(query as CFDictionary)
+        let status = SecItemDelete(baseQuery() as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.unhandledError(status)
         }
+    }
+
+    private func baseQuery() -> [CFString: Any] {
+        var query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service
+        ]
+        if let accessGroup {
+            query[kSecAttrAccessGroup] = accessGroup
+        }
+        return query
     }
 }

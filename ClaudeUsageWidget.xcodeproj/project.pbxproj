@@ -34,6 +34,7 @@
 		BC0451C8C64C51D669C6545B /* SessionCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6ABE6F1C9AE1CA419DDE002 /* SessionCredentials.swift */; };
 		C28183C2ADE91B4C841579DC /* ErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2F7B435BA582C196E29C75 /* ErrorView.swift */; };
 		C3A7E36D7A2652C89806C5B7 /* UsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE6388246DF4DF751B02B74 /* UsageService.swift */; };
+		C6FA7297826F3B57745187D1 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E9EF629901C111918BF9917 /* KeychainStoreTests.swift */; };
 		CB2AE247F9346F93BCA9120B /* SessionCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6ABE6F1C9AE1CA419DDE002 /* SessionCredentials.swift */; };
 		D1057B27095C906671F546BF /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6B2B16CD5F4A3B2D640C3012 /* WidgetKit.framework */; };
 		D2E9E36D0811A97ADF702618 /* UsageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302FA9DC8011AFC535C990D2 /* UsageCache.swift */; };
@@ -73,6 +74,7 @@
 		0146573075DEE3DECDD8ED63 /* ClaudeUsageWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageWidget.swift; sourceTree = "<group>"; };
 		0A4EA14192990C3C95E3F661 /* UsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageProvider.swift; sourceTree = "<group>"; };
 		13FABF54B19D3AD5C2492B3F /* SmallWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmallWidgetView.swift; sourceTree = "<group>"; };
+		2E9EF629901C111918BF9917 /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
 		302FA9DC8011AFC535C990D2 /* UsageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCache.swift; sourceTree = "<group>"; };
 		428A90E6A15D3420140BC9BF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		50B95FC104FF2EA874AB4DF2 /* WidgetEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetEntryView.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 		05A7DFBAF33922E7364D68DD /* ClaudeUsageWidgetTests */ = {
 			isa = PBXGroup;
 			children = (
+				2E9EF629901C111918BF9917 /* KeychainStoreTests.swift */,
 				8BD395ED69FE96C6A6AAB52F /* UsageServiceTests.swift */,
 			);
 			path = ClaudeUsageWidgetTests;
@@ -309,7 +312,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2650;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					5278E9C543C99CD7ABD891F7 = {
 						DevelopmentTeam = HR4LVL7TKY;
@@ -361,6 +364,7 @@
 			files = (
 				EBBB450900C759DC6CEC4548 /* EntryState.swift in Sources */,
 				85B9A47A24F5BFF1137A2B9A /* KeychainStore.swift in Sources */,
+				C6FA7297826F3B57745187D1 /* KeychainStoreTests.swift in Sources */,
 				CB2AE247F9346F93BCA9120B /* SessionCredentials.swift in Sources */,
 				AFB0D49C1C045431E164D1F9 /* UsageCache.swift in Sources */,
 				44C78CB4E2CB90A6325724E9 /* UsageData.swift in Sources */,
@@ -424,7 +428,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = ClaudeUsageWidget/Resources/ClaudeUsageWidgetApp.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = ClaudeUsageWidget/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -442,7 +445,6 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ClaudeUsageWidget/Resources/ClaudeUsageWidgetExtension.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = ClaudeUsageWidget/Widget/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -522,7 +524,6 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -540,7 +541,6 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -558,7 +558,6 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ClaudeUsageWidget/Resources/ClaudeUsageWidgetExtension.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = ClaudeUsageWidget/Widget/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -646,7 +645,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = ClaudeUsageWidget/Resources/ClaudeUsageWidgetApp.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEAD_CODE_STRIPPING = YES;
 				INFOPLIST_FILE = ClaudeUsageWidget/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
