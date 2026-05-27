@@ -52,9 +52,44 @@ final class UsageServiceHTTPTests: XCTestCase {
             (HTTPURLResponse(url: URL(string: "https://x")!, statusCode: 429, httpVersion: nil, headerFields: nil)!, Data())
         }
         await XCTAssertThrowsErrorAsync(try await self.makeService().fetchUsage(credentials: self.creds)) { error in
-            guard case UsageServiceError.unexpectedResponse(429) = error else {
-                return XCTFail("expected .unexpectedResponse(429), got \(error)")
+            guard case UsageServiceError.rateLimited(let retryAfter) = error else {
+                return XCTFail("expected .rateLimited, got \(error)")
             }
+            XCTAssertNil(retryAfter)
+        }
+    }
+
+    func testHonorsRetryAfterHeaderOn429() async {
+        StubURLProtocol.handler = { _ in
+            (HTTPURLResponse(
+                url: URL(string: "https://x")!,
+                statusCode: 429,
+                httpVersion: nil,
+                headerFields: ["Retry-After": "120"]
+            )!, Data())
+        }
+        await XCTAssertThrowsErrorAsync(try await self.makeService().fetchUsage(credentials: self.creds)) { error in
+            guard case UsageServiceError.rateLimited(let retryAfter) = error else {
+                return XCTFail("expected .rateLimited, got \(error)")
+            }
+            XCTAssertEqual(retryAfter, 120)
+        }
+    }
+
+    func testIgnoresInvalidRetryAfterHeader() async {
+        StubURLProtocol.handler = { _ in
+            (HTTPURLResponse(
+                url: URL(string: "https://x")!,
+                statusCode: 429,
+                httpVersion: nil,
+                headerFields: ["Retry-After": "Mon, 01 Jan 2030 00:00:00 GMT"]  // HTTP-date form: not parsed
+            )!, Data())
+        }
+        await XCTAssertThrowsErrorAsync(try await self.makeService().fetchUsage(credentials: self.creds)) { error in
+            guard case UsageServiceError.rateLimited(let retryAfter) = error else {
+                return XCTFail("expected .rateLimited, got \(error)")
+            }
+            XCTAssertNil(retryAfter)
         }
     }
 

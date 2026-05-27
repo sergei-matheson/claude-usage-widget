@@ -54,4 +54,27 @@ final class UsageCacheTests: XCTestCase {
         let cache = UsageCache(cacheURL: tempURL)
         XCTAssertNil(cache.load())
     }
+
+    func testReturnsNilOnUnknownSchemaVersion() throws {
+        // An envelope with version 999 is a future format we don't understand.
+        let future = #"{"version":999,"usage":{"fiveHourUtilization":1,"sevenDayUtilization":1,"lastUpdated":"2026-01-01T00:00:00Z"}}"#
+        try Data(future.utf8).write(to: tempURL)
+        let cache = UsageCache(cacheURL: tempURL)
+        XCTAssertNil(cache.load())
+    }
+
+    func testDeletesFileOnExpiry() throws {
+        let cache = UsageCache(cacheURL: tempURL)
+        let stale = sample(lastUpdated: Date().addingTimeInterval(-(UsageCache.maxCacheAge + 60)))
+        try cache.save(stale)
+        _ = cache.load()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempURL.path))
+    }
+
+    func testDeletesFileOnCorruption() throws {
+        try Data("garbage".utf8).write(to: tempURL)
+        let cache = UsageCache(cacheURL: tempURL)
+        _ = cache.load()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempURL.path))
+    }
 }

@@ -23,8 +23,7 @@ final class UsageServiceTests: XCTestCase {
     """
 
     func testParsesUtilizationValues() throws {
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(fullResponseJSON))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(fullResponseJSON))
 
         XCTAssertEqual(usage.fiveHourUtilization, 15)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
@@ -37,16 +36,14 @@ final class UsageServiceTests: XCTestCase {
           "seven_day": { "utilization": 2.4, "resets_at": null }
         }
         """
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(json))
 
         XCTAssertEqual(usage.fiveHourUtilization, 16)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
     }
 
     func testParsesFractionalSecondsResetDate() throws {
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(fullResponseJSON))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(fullResponseJSON))
 
         var components = DateComponents()
         components.year = 2026; components.month = 5; components.day = 25
@@ -64,8 +61,7 @@ final class UsageServiceTests: XCTestCase {
         let json = """
         { "seven_day": { "utilization": 5.0, "resets_at": null } }
         """
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(json))
 
         XCTAssertEqual(usage.fiveHourUtilization, 0)
         XCTAssertNil(usage.periodResetDate)
@@ -78,8 +74,7 @@ final class UsageServiceTests: XCTestCase {
           "seven_day": { "utilization": 1.0, "resets_at": null }
         }
         """
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(json))
 
         XCTAssertNil(usage.periodResetDate)
         XCTAssertNil(usage.sevenDayResetDate)
@@ -95,9 +90,7 @@ final class UsageServiceTests: XCTestCase {
           "omelette_promotional": null
         }
         """
-        XCTAssertNoThrow(
-            try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
-        )
+        XCTAssertNoThrow(try UsageService.parse(data: makeData(json)))
     }
 
     // MARK: - buildURL

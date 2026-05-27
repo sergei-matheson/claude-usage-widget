@@ -13,10 +13,8 @@ struct KeychainStore {
 
     // Production init — uses the shared access group so both the app and widget extension can read credentials
     init() {
-        // Must match the Keychain Sharing entitlement in both targets
-        self.service = "io.github.sergei-matheson.claudeusagewidget.session"
-        // $(AppIdentifierPrefix) expands to TeamID + "." at build time, so the runtime value is HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget
-        self.accessGroup = "HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget"
+        self.service = BundleIdentifiers.keychainService
+        self.accessGroup = BundleIdentifiers.keychainAccessGroup
     }
 
     // Internal init for testing — pass a unique service name and omit the access group so tests run in the sandbox
