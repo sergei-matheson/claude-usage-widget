@@ -23,12 +23,12 @@ private enum Entitlements {
         if let groups = value as? [String] {
             return groups
         }
-        assertionFailure(
-            "Expected array or string for keychain-access-groups entitlement, got \(String(describing: type(of: value))). Check entitlements configuration."
-        )
         if let group = value as? String {
             return [group]
         }
+        assertionFailure(
+            "Expected array or string for keychain-access-groups entitlement, got \(String(describing: type(of: value))). Check entitlements configuration."
+        )
         return []
     }()
 }
