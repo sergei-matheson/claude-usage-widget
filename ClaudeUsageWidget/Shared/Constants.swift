@@ -30,9 +30,9 @@ enum AppDeepLink: Equatable {
 
     static func parse(_ url: URL) -> AppDeepLink? {
         guard url.scheme?.lowercased() == "claudeusagewidget" else { return nil }
-        if url.host?.lowercased() == "retry" { return .retry }
-        if url.path.lowercased() == "/retry" { return .retry }
-        return nil
+        let target = "retry"
+        let matchesRetry = url.host?.lowercased() == target || url.path.lowercased() == "/\(target)"
+        return matchesRetry ? .retry : nil
     }
 }
 
