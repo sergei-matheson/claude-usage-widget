@@ -23,11 +23,9 @@ final class UsageServiceTests: XCTestCase {
     """
 
     func testParsesUtilizationValues() throws {
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(fullResponseJSON))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(fullResponseJSON))
 
-        XCTAssertEqual(usage.messagesUsed, 15)
-        XCTAssertEqual(usage.messagesLimit, 100)
+        XCTAssertEqual(usage.fiveHourUtilization, 15)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
     }
 
@@ -38,25 +36,23 @@ final class UsageServiceTests: XCTestCase {
           "seven_day": { "utilization": 2.4, "resets_at": null }
         }
         """
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(json))
 
-        XCTAssertEqual(usage.messagesUsed, 16)
+        XCTAssertEqual(usage.fiveHourUtilization, 16)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
     }
 
     func testParsesFractionalSecondsResetDate() throws {
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(fullResponseJSON))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(fullResponseJSON))
 
-        // Date should be parsed from the string, not fall back to "now + 5h"
         var components = DateComponents()
         components.year = 2026; components.month = 5; components.day = 25
         components.hour = 10; components.minute = 0; components.second = 1
         components.timeZone = TimeZone(identifier: "UTC")
         let expected = Calendar(identifier: .gregorian).date(from: components)!
 
-        XCTAssertEqual(usage.periodResetDate.timeIntervalSince1970,
+        let parsed = try XCTUnwrap(usage.periodResetDate)
+        XCTAssertEqual(parsed.timeIntervalSince1970,
                        expected.timeIntervalSince1970,
                        accuracy: 1.0)
     }
@@ -65,36 +61,23 @@ final class UsageServiceTests: XCTestCase {
         let json = """
         { "seven_day": { "utilization": 5.0, "resets_at": null } }
         """
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(json))
 
-        XCTAssertEqual(usage.messagesUsed, 0)
-        // Fallback reset should be approximately 5 hours from now
-        let expectedFallback = Date().addingTimeInterval(3600 * 5)
-        XCTAssertEqual(usage.periodResetDate.timeIntervalSince1970,
-                       expectedFallback.timeIntervalSince1970,
-                       accuracy: 5.0)
+        XCTAssertEqual(usage.fiveHourUtilization, 0)
+        XCTAssertNil(usage.periodResetDate)
     }
 
-    func testFallsBackWhenResetDateIsNull() throws {
+    func testResetDatesAreNilWhenAPIReturnsNull() throws {
         let json = """
         {
           "five_hour": { "utilization": 10.0, "resets_at": null },
           "seven_day": { "utilization": 1.0, "resets_at": null }
         }
         """
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
-        let usage = response.toUsageData()
+        let usage = try UsageService.parse(data: makeData(json))
 
-        let expectedFiveHourFallback = Date().addingTimeInterval(3600 * 5)
-        let expectedSevenDayFallback = Date().addingTimeInterval(86400 * 7)
-
-        XCTAssertEqual(usage.periodResetDate.timeIntervalSince1970,
-                       expectedFiveHourFallback.timeIntervalSince1970,
-                       accuracy: 5.0)
-        XCTAssertEqual(usage.sevenDayResetDate.timeIntervalSince1970,
-                       expectedSevenDayFallback.timeIntervalSince1970,
-                       accuracy: 5.0)
+        XCTAssertNil(usage.periodResetDate)
+        XCTAssertNil(usage.sevenDayResetDate)
     }
 
     func testIgnoresUnknownTopLevelKeys() throws {
@@ -107,14 +90,36 @@ final class UsageServiceTests: XCTestCase {
           "omelette_promotional": null
         }
         """
-        XCTAssertNoThrow(
-            try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
+        XCTAssertNoThrow(try UsageService.parse(data: makeData(json)))
+    }
+
+    // MARK: - buildURL
+
+    func testBuildURLWithEmptyOrgId() {
+        let service = UsageService()
+        let url = service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: ""))
+        XCTAssertEqual(url?.absoluteString, "https://claude.ai/api/usage")
+    }
+
+    func testBuildURLWithValidOrgId() {
+        let service = UsageService()
+        let url = service.buildURL(credentials: SessionCredentials(
+            sessionKey: "k",
+            organizationId: "1a2b3c4d-5e6f-7890-abcd-ef0123456789"
+        ))
+        XCTAssertEqual(
+            url?.absoluteString,
+            "https://claude.ai/api/organizations/1a2b3c4d-5e6f-7890-abcd-ef0123456789/usage"
         )
     }
 
-    func testPlanNameIsPro() throws {
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(fullResponseJSON))
-        XCTAssertEqual(response.toUsageData().planName, "Pro")
+    func testBuildURLRejectsPathTraversal() {
+        let service = UsageService()
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "../me")))
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo/bar")))
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo bar")))
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo#frag")))
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo?q=1")))
     }
 
     func testSevenDayResetDateParsedFromFullResponse() throws {

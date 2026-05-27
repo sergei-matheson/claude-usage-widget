@@ -13,10 +13,8 @@ struct KeychainStore {
 
     // Production init — uses the shared access group so both the app and widget extension can read credentials
     init() {
-        // Must match the Keychain Sharing entitlement in both targets
-        self.service = "io.github.sergei-matheson.claudeusagewidget.session"
-        // $(AppIdentifierPrefix) expands to TeamID + "." at build time, so the runtime value is HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget
-        self.accessGroup = "HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget"
+        self.service = BundleIdentifiers.keychainService
+        self.accessGroup = BundleIdentifiers.keychainAccessGroup
     }
 
     // Internal init for testing — pass a unique service name and omit the access group so tests run in the sandbox
@@ -28,12 +26,17 @@ struct KeychainStore {
     func save(_ credentials: SessionCredentials) throws {
         let data = try JSONEncoder().encode(credentials)
 
-        let updateStatus = SecItemUpdate(baseQuery() as CFDictionary, [kSecValueData: data] as CFDictionary)
+        // kSecAttrAccessibleAfterFirstUnlock allows the extension to read even before user unlock.
+        // Always re-asserted on update so an item created with a weaker class can't survive.
+        let attributesToUpdate: [CFString: Any] = [
+            kSecValueData: data,
+            kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        let updateStatus = SecItemUpdate(baseQuery() as CFDictionary, attributesToUpdate as CFDictionary)
 
         if updateStatus == errSecItemNotFound {
             var addQuery = baseQuery()
             addQuery[kSecValueData] = data
-            // kSecAttrAccessibleAfterFirstUnlock allows the extension to read even before user unlock
             addQuery[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlock
             let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
             guard addStatus == errSecSuccess else {
@@ -69,7 +72,9 @@ struct KeychainStore {
     private func baseQuery() -> [CFString: Any] {
         var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service
+            kSecAttrService: service,
+            // Defense in depth: never let this item replicate via iCloud Keychain.
+            kSecAttrSynchronizable: kCFBooleanFalse as Any
         ]
         if let accessGroup {
             query[kSecAttrAccessGroup] = accessGroup

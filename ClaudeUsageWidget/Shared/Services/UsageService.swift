@@ -2,6 +2,8 @@ import Foundation
 
 enum UsageServiceError: Error {
     case unauthenticated
+    case invalidOrganizationId
+    case rateLimited(retryAfter: TimeInterval?)
     case networkError(Error)
     case decodingError(Error)
     case unexpectedResponse(Int)
@@ -12,7 +14,15 @@ struct UsageService {
     // network traffic on https://claude.ai/settings/usage before shipping.
     private let session: URLSession
 
+<<<<<<< HEAD
     init() {
+=======
+    init(session: URLSession = UsageService.defaultSession) {
+        self.session = session
+    }
+
+    static let defaultSession: URLSession = {
+>>>>>>> origin/main
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 15
@@ -25,7 +35,9 @@ struct UsageService {
     }
 
     func fetchUsage(credentials: SessionCredentials) async throws -> UsageData {
-        let url = buildURL(credentials: credentials)
+        guard let url = buildURL(credentials: credentials) else {
+            throw UsageServiceError.invalidOrganizationId
+        }
         var request = URLRequest(url: url)
         request.setValue("sessionKey=\(credentials.sessionKey)", forHTTPHeaderField: "Cookie")
         request.setValue("ClaudeUsageWidget/1.0 macOS", forHTTPHeaderField: "User-Agent")
@@ -48,59 +60,88 @@ struct UsageService {
         case 401, 403:
             throw UsageServiceError.unauthenticated
         case 429:
-            throw UsageServiceError.unexpectedResponse(429)
+            throw UsageServiceError.rateLimited(retryAfter: Self.parseRetryAfter(http))
         default:
             throw UsageServiceError.unexpectedResponse(http.statusCode)
         }
 
+        return try Self.parse(data: data)
+    }
+
+    // Decode a Claude usage payload into UsageData. Exposed for tests; not part of the public API
+    // that views or providers should call.
+    static func parse(data: Data) throws -> UsageData {
         do {
-            let apiResponse = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: data)
-            return apiResponse.toUsageData()
+            return try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: data).toUsageData()
         } catch {
             throw UsageServiceError.decodingError(error)
         }
     }
 
-    private func buildURL(credentials: SessionCredentials) -> URL {
+    // Claude org IDs are UUIDs. Anything else is rejected so a hostile org-ID value
+    // can't pivot the authenticated request to another claude.ai path.
+    static let organizationIdPattern = #/^[A-Za-z0-9-]{1,64}$/#
+
+    // Retry-After is either a delay in seconds or an HTTP-date. We honor the seconds form;
+    // an HTTP-date is rare from claude.ai and falls back to the policy default.
+    static func parseRetryAfter(_ response: HTTPURLResponse) -> TimeInterval? {
+        guard let header = response.value(forHTTPHeaderField: "Retry-After"),
+              let seconds = TimeInterval(header.trimmingCharacters(in: .whitespaces)),
+              seconds > 0 else { return nil }
+        return seconds
+    }
+
+    func buildURL(credentials: SessionCredentials) -> URL? {
         if credentials.organizationId.isEmpty {
-            return URL(string: "https://claude.ai/api/usage")!
+            return URL(string: "https://claude.ai/api/usage")
         }
-        return URL(string: "https://claude.ai/api/organizations/\(credentials.organizationId)/usage")!
+        guard (try? Self.organizationIdPattern.wholeMatch(in: credentials.organizationId)) != nil else {
+            return nil
+        }
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "claude.ai"
+        components.path = "/api/organizations/\(credentials.organizationId)/usage"
+        return components.url
     }
 }
 
-struct UsageBucket: Codable {
+private struct UsageBucket: Codable {
     let utilization: Double?
     let resetsAt: String?
 }
 
-struct UsageAPIResponse: Codable {
+private struct UsageAPIResponse: Codable {
     let fiveHour: UsageBucket?
     let sevenDay: UsageBucket?
 
     func toUsageData() -> UsageData {
         let utilization = fiveHour?.utilization ?? 0
-        let resetDate = parseDate(fiveHour?.resetsAt) ?? Date().addingTimeInterval(3600 * 5)
         let sevenDayUtilization = sevenDay?.utilization ?? 0
-        let sevenDayResetDate = parseDate(sevenDay?.resetsAt) ?? Date().addingTimeInterval(86400 * 7)
 
         return UsageData(
-            messagesUsed: Int(utilization.rounded()),
-            messagesLimit: 100,
-            planName: "Pro",
-            periodResetDate: resetDate,
+            fiveHourUtilization: Int(utilization.rounded()),
+            periodResetDate: Self.parseDate(fiveHour?.resetsAt),
             sevenDayUtilization: Int(sevenDayUtilization.rounded()),
-            sevenDayResetDate: sevenDayResetDate,
+            sevenDayResetDate: Self.parseDate(sevenDay?.resetsAt),
             lastUpdated: Date()
         )
     }
 
-    private func parseDate(_ string: String?) -> Date? {
+    private static let isoFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let isoBasic: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    private static func parseDate(_ string: String?) -> Date? {
         guard let string else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: string) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: string)
+        return isoFractional.date(from: string) ?? isoBasic.date(from: string)
     }
 }

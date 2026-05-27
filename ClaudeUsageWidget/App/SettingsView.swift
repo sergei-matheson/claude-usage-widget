@@ -5,6 +5,8 @@ struct SettingsView: View {
     @State private var sessionToken = ""
     @State private var organizationId = ""
     @State private var statusMessage = ""
+    @State private var hasSavedToken = false
+    @State private var statusClearTask: Task<Void, Never>?
 
     private let keychain = KeychainStore()
 
@@ -13,6 +15,11 @@ struct SettingsView: View {
             Section {
                 SecureField("Session token", text: $sessionToken)
                 TextField("Organization ID (optional)", text: $organizationId)
+                if hasSavedToken {
+                    Label("Token saved", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.caption)
+                }
             } header: {
                 Text("Claude.ai Credentials")
             } footer: {
@@ -28,6 +35,7 @@ struct SettingsView: View {
                     .disabled(sessionToken.isEmpty)
 
                 Button("Clear", role: .destructive) { clearCredentials() }
+                    .disabled(!hasSavedToken)
             }
 
             if !statusMessage.isEmpty {
@@ -39,36 +47,71 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(minWidth: 420, idealWidth: 480, minHeight: 320)
-        .onAppear(perform: loadExistingOrgID)
+        .onAppear(perform: loadExistingState)
     }
 
-    private func loadExistingOrgID() {
+    private func loadExistingState() {
         if let existing = try? keychain.load() {
             organizationId = existing.organizationId
+            hasSavedToken = !existing.sessionKey.isEmpty
+        }
+    }
+
+    private func setStatus(_ message: String) {
+        statusMessage = message
+        statusClearTask?.cancel()
+        statusClearTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if !Task.isCancelled { statusMessage = "" }
         }
     }
 
     private func saveCredentials() {
-        guard !sessionToken.isEmpty else { return }
-        let credentials = SessionCredentials(sessionKey: sessionToken, organizationId: organizationId)
+        let trimmedToken = sessionToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedOrg = organizationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedToken.isEmpty else { return }
+
+        // Reject anything that could smuggle a CRLF or terminator into the Cookie header.
+        if trimmedToken.rangeOfCharacter(from: SettingsView.invalidTokenCharacters) != nil {
+            setStatus("Session token contains invalid characters.")
+            return
+        }
+
+        if !trimmedOrg.isEmpty,
+           (try? UsageService.organizationIdPattern.wholeMatch(in: trimmedOrg)) == nil {
+            setStatus("Organization ID must be alphanumeric (with dashes).")
+            return
+        }
+
+        let credentials = SessionCredentials(sessionKey: trimmedToken, organizationId: trimmedOrg)
         do {
             try keychain.save(credentials)
             WidgetCenter.shared.reloadAllTimelines()
-            statusMessage = "Saved. Widget will refresh shortly."
+            hasSavedToken = true
             sessionToken = ""
+            setStatus("Saved. Widget will refresh shortly.")
         } catch {
-            statusMessage = "Failed to save credentials."
+            setStatus("Failed to save credentials.")
         }
     }
+
+    // Control chars + Cookie-separator characters that have no business inside a session token.
+    private static let invalidTokenCharacters: CharacterSet = {
+        var set = CharacterSet.controlCharacters
+        set.insert(charactersIn: ";,\"\\")
+        set.formUnion(.whitespacesAndNewlines)
+        return set
+    }()
 
     private func clearCredentials() {
         do {
             try keychain.delete()
             WidgetCenter.shared.reloadAllTimelines()
             organizationId = ""
-            statusMessage = "Credentials cleared."
+            hasSavedToken = false
+            setStatus("Credentials cleared.")
         } catch {
-            statusMessage = "Failed to clear credentials."
+            setStatus("Failed to clear credentials.")
         }
     }
 }

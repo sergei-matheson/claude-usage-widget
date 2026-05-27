@@ -4,14 +4,14 @@ struct SmallWidgetView: View {
     let usage: UsageData
 
     private var usageFraction: Double {
-        guard usage.messagesLimit > 0 else { return 0 }
-        return min(Double(usage.messagesUsed) / Double(usage.messagesLimit), 1.0)
+        min(Double(usage.fiveHourUtilization) / 100.0, 1.0)
     }
 
     private var timeUntilReset: String {
+        guard let reset = usage.periodResetDate else { return "Reset time unknown" }
         let now = Date()
-        guard usage.periodResetDate > now else { return "Resetting…" }
-        let components = Calendar.current.dateComponents([.day, .hour, .minute], from: now, to: usage.periodResetDate)
+        guard reset > now else { return "Resetting…" }
+        let components = Calendar.current.dateComponents([.day, .hour, .minute], from: now, to: reset)
         let days = components.day ?? 0
         let hours = components.hour ?? 0
         let minutes = components.minute ?? 0
@@ -21,35 +21,19 @@ struct SmallWidgetView: View {
     }
 
     private var isStale: Bool {
-        Date().timeIntervalSince(usage.lastUpdated) > 1800
+        Date().timeIntervalSince(usage.lastUpdated) > RefreshPolicy.staleThreshold
     }
 
     var body: some View {
         VStack(spacing: 4) {
-            if usage.messagesLimit == 0 {
-                unlimitedView
-            } else {
-                progressArc
-                usageText
-            }
-            planBadge
+            progressArc
+            usageText
             resetLabel
             if isStale {
                 staleLabel
             }
         }
         .padding(10)
-    }
-
-    private var unlimitedView: some View {
-        VStack(spacing: 2) {
-            Image(systemName: "infinity")
-                .font(.title2)
-                .foregroundStyle(.tint)
-            Text("\(usage.messagesUsed) used")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
     }
 
     private var progressArc: some View {
@@ -71,24 +55,16 @@ struct SmallWidgetView: View {
     }
 
     private var usageText: some View {
-        Text("\(usage.messagesUsed)/\(usage.messagesLimit)")
+        Text("5h \(usage.fiveHourUtilization)%")
             .font(.system(.caption2, design: .monospaced))
             .foregroundStyle(.primary)
     }
 
-    private var planBadge: some View {
-        Text(usage.planName)
-            .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(.tint.opacity(0.15), in: Capsule())
-            .foregroundStyle(.tint)
-    }
-
     private var resetLabel: some View {
-        Text(timeUntilReset)
+        let isOverdue = (usage.periodResetDate.map { $0 < Date() }) ?? false
+        return Text(timeUntilReset)
             .font(.caption2)
-            .foregroundStyle(usage.periodResetDate < Date() ? .orange : .secondary)
+            .foregroundStyle(isOverdue ? .orange : .secondary)
     }
 
     private var staleLabel: some View {

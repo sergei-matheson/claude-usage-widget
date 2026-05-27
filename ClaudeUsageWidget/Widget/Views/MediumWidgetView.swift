@@ -35,9 +35,10 @@ private struct SevenDayRowView: View {
     }
 
     private var resetLabel: String {
+        guard let reset = usage.sevenDayResetDate else { return "Reset time unknown" }
         let now = Date()
-        guard usage.sevenDayResetDate > now else { return "Resetting…" }
-        let components = Calendar.current.dateComponents([.day, .hour], from: now, to: usage.sevenDayResetDate)
+        guard reset > now else { return "Resetting…" }
+        let components = Calendar.current.dateComponents([.day, .hour], from: now, to: reset)
         let days = components.day ?? 0
         let hours = components.hour ?? 0
         if days > 0 { return "Resets in \(days)d" }
