@@ -127,21 +127,21 @@ final class SharedConstantsTests: XCTestCase {
         XCTAssertEqual(RefreshPolicy.rateLimitedFallback, 3600)
         XCTAssertEqual(RefreshPolicy.staleThreshold, RefreshPolicy.refreshInterval * 2)
     }
+}
 
-    final class AppDeepLinkTests: XCTestCase {
-        func testParseRetryByHost() {
-            let url = URL(string: "claudeusagewidget://retry")!
-            XCTAssertEqual(AppDeepLink.parse(url), .retry)
-        }
+final class AppDeepLinkTests: XCTestCase {
+    func testParseRetryByHost() {
+        let url = URL(string: "claudeusagewidget://retry")!
+        XCTAssertEqual(AppDeepLink.parse(url), .retry)
+    }
 
-        func testParseRetryByPath() {
-            let url = URL(string: "claudeusagewidget:///retry")!
-            XCTAssertEqual(AppDeepLink.parse(url), .retry)
-        }
+    func testParseRetryByPath() {
+        let url = URL(string: "claudeusagewidget:///retry")!
+        XCTAssertEqual(AppDeepLink.parse(url), .retry)
+    }
 
-        func testRejectsUnknownURLs() {
-            XCTAssertNil(AppDeepLink.parse(URL(string: "https://claude.ai/retry")!))
-            XCTAssertNil(AppDeepLink.parse(URL(string: "claudeusagewidget://settings")!))
-        }
+    func testRejectsUnknownURLs() {
+        XCTAssertNil(AppDeepLink.parse(URL(string: "https://claude.ai/retry")!))
+        XCTAssertNil(AppDeepLink.parse(URL(string: "claudeusagewidget://settings")!))
     }
 }
