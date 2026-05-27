@@ -1,9 +1,7 @@
 import Foundation
 
 struct UsageData: Codable, Equatable {
-    let messagesUsed: Int
-    let messagesLimit: Int
-    let planName: String
+    let fiveHourUtilization: Int
     let periodResetDate: Date
     let sevenDayUtilization: Int
     let sevenDayResetDate: Date
@@ -11,9 +9,7 @@ struct UsageData: Codable, Equatable {
 
     static func placeholder() -> UsageData {
         UsageData(
-            messagesUsed: 42,
-            messagesLimit: 100,
-            planName: "Pro",
+            fiveHourUtilization: 42,
             periodResetDate: Date().addingTimeInterval(3600 * 3),
             sevenDayUtilization: 18,
             sevenDayResetDate: Date().addingTimeInterval(86400 * 5),

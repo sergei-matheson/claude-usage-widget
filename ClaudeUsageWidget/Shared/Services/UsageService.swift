@@ -2,6 +2,7 @@ import Foundation
 
 enum UsageServiceError: Error {
     case unauthenticated
+    case invalidOrganizationId
     case networkError(Error)
     case decodingError(Error)
     case unexpectedResponse(Int)
@@ -18,7 +19,9 @@ struct UsageService {
     }()
 
     func fetchUsage(credentials: SessionCredentials) async throws -> UsageData {
-        let url = buildURL(credentials: credentials)
+        guard let url = buildURL(credentials: credentials) else {
+            throw UsageServiceError.invalidOrganizationId
+        }
         var request = URLRequest(url: url)
         request.setValue("sessionKey=\(credentials.sessionKey)", forHTTPHeaderField: "Cookie")
         request.setValue("ClaudeUsageWidget/1.0 macOS", forHTTPHeaderField: "User-Agent")
@@ -54,11 +57,22 @@ struct UsageService {
         }
     }
 
-    private func buildURL(credentials: SessionCredentials) -> URL {
+    // Claude org IDs are UUIDs. Anything else is rejected so a hostile org-ID value
+    // can't pivot the authenticated request to another claude.ai path.
+    static let organizationIdPattern = #/^[A-Za-z0-9-]{1,64}$/#
+
+    func buildURL(credentials: SessionCredentials) -> URL? {
         if credentials.organizationId.isEmpty {
-            return URL(string: "https://claude.ai/api/usage")!
+            return URL(string: "https://claude.ai/api/usage")
         }
-        return URL(string: "https://claude.ai/api/organizations/\(credentials.organizationId)/usage")!
+        guard (try? Self.organizationIdPattern.wholeMatch(in: credentials.organizationId)) != nil else {
+            return nil
+        }
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "claude.ai"
+        components.path = "/api/organizations/\(credentials.organizationId)/usage"
+        return components.url
     }
 }
 
@@ -78,9 +92,7 @@ struct UsageAPIResponse: Codable {
         let sevenDayResetDate = parseDate(sevenDay?.resetsAt) ?? Date().addingTimeInterval(86400 * 7)
 
         return UsageData(
-            messagesUsed: Int(utilization.rounded()),
-            messagesLimit: 100,
-            planName: "Pro",
+            fiveHourUtilization: Int(utilization.rounded()),
             periodResetDate: resetDate,
             sevenDayUtilization: Int(sevenDayUtilization.rounded()),
             sevenDayResetDate: sevenDayResetDate,

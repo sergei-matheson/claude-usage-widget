@@ -26,8 +26,7 @@ final class UsageServiceTests: XCTestCase {
         let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(fullResponseJSON))
         let usage = response.toUsageData()
 
-        XCTAssertEqual(usage.messagesUsed, 15)
-        XCTAssertEqual(usage.messagesLimit, 100)
+        XCTAssertEqual(usage.fiveHourUtilization, 15)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
     }
 
@@ -41,7 +40,7 @@ final class UsageServiceTests: XCTestCase {
         let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
         let usage = response.toUsageData()
 
-        XCTAssertEqual(usage.messagesUsed, 16)
+        XCTAssertEqual(usage.fiveHourUtilization, 16)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
     }
 
@@ -68,7 +67,7 @@ final class UsageServiceTests: XCTestCase {
         let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
         let usage = response.toUsageData()
 
-        XCTAssertEqual(usage.messagesUsed, 0)
+        XCTAssertEqual(usage.fiveHourUtilization, 0)
         // Fallback reset should be approximately 5 hours from now
         let expectedFallback = Date().addingTimeInterval(3600 * 5)
         XCTAssertEqual(usage.periodResetDate.timeIntervalSince1970,
@@ -112,8 +111,32 @@ final class UsageServiceTests: XCTestCase {
         )
     }
 
-    func testPlanNameIsPro() throws {
-        let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(fullResponseJSON))
-        XCTAssertEqual(response.toUsageData().planName, "Pro")
+    // MARK: - buildURL
+
+    func testBuildURLWithEmptyOrgId() {
+        let service = UsageService()
+        let url = service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: ""))
+        XCTAssertEqual(url?.absoluteString, "https://claude.ai/api/usage")
+    }
+
+    func testBuildURLWithValidOrgId() {
+        let service = UsageService()
+        let url = service.buildURL(credentials: SessionCredentials(
+            sessionKey: "k",
+            organizationId: "1a2b3c4d-5e6f-7890-abcd-ef0123456789"
+        ))
+        XCTAssertEqual(
+            url?.absoluteString,
+            "https://claude.ai/api/organizations/1a2b3c4d-5e6f-7890-abcd-ef0123456789/usage"
+        )
+    }
+
+    func testBuildURLRejectsPathTraversal() {
+        let service = UsageService()
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "../me")))
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo/bar")))
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo bar")))
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo#frag")))
+        XCTAssertNil(service.buildURL(credentials: SessionCredentials(sessionKey: "k", organizationId: "foo?q=1")))
     }
 }
