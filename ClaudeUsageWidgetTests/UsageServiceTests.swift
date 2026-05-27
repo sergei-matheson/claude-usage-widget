@@ -48,14 +48,14 @@ final class UsageServiceTests: XCTestCase {
         let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(fullResponseJSON))
         let usage = response.toUsageData()
 
-        // Date should be parsed from the string, not fall back to "now + 5h"
         var components = DateComponents()
         components.year = 2026; components.month = 5; components.day = 25
         components.hour = 10; components.minute = 0; components.second = 1
         components.timeZone = TimeZone(identifier: "UTC")
         let expected = Calendar(identifier: .gregorian).date(from: components)!
 
-        XCTAssertEqual(usage.periodResetDate.timeIntervalSince1970,
+        let parsed = try XCTUnwrap(usage.periodResetDate)
+        XCTAssertEqual(parsed.timeIntervalSince1970,
                        expected.timeIntervalSince1970,
                        accuracy: 1.0)
     }
@@ -68,14 +68,10 @@ final class UsageServiceTests: XCTestCase {
         let usage = response.toUsageData()
 
         XCTAssertEqual(usage.fiveHourUtilization, 0)
-        // Fallback reset should be approximately 5 hours from now
-        let expectedFallback = Date().addingTimeInterval(3600 * 5)
-        XCTAssertEqual(usage.periodResetDate.timeIntervalSince1970,
-                       expectedFallback.timeIntervalSince1970,
-                       accuracy: 5.0)
+        XCTAssertNil(usage.periodResetDate)
     }
 
-    func testFallsBackWhenResetDateIsNull() throws {
+    func testResetDatesAreNilWhenAPIReturnsNull() throws {
         let json = """
         {
           "five_hour": { "utilization": 10.0, "resets_at": null },
@@ -85,15 +81,8 @@ final class UsageServiceTests: XCTestCase {
         let response = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: makeData(json))
         let usage = response.toUsageData()
 
-        let expectedFiveHourFallback = Date().addingTimeInterval(3600 * 5)
-        let expectedSevenDayFallback = Date().addingTimeInterval(86400 * 7)
-
-        XCTAssertEqual(usage.periodResetDate.timeIntervalSince1970,
-                       expectedFiveHourFallback.timeIntervalSince1970,
-                       accuracy: 5.0)
-        XCTAssertEqual(usage.sevenDayResetDate.timeIntervalSince1970,
-                       expectedSevenDayFallback.timeIntervalSince1970,
-                       accuracy: 5.0)
+        XCTAssertNil(usage.periodResetDate)
+        XCTAssertNil(usage.sevenDayResetDate)
     }
 
     func testIgnoresUnknownTopLevelKeys() throws {
