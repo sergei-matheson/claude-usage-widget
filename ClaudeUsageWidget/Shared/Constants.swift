@@ -14,13 +14,13 @@ enum BundleIdentifiers {
 
 private enum Entitlements {
     static var keychainAccessGroups: [String] {
-        guard let task = SecTaskCreateFromSelf(nil),
-              let value = SecTaskCopyValueForEntitlement(
-                  task,
-                  "keychain-access-groups" as CFString,
-                  nil
-              ) else { return [] }
+        guard let task = SecTaskCreateFromSelf(nil) else { return [] }
         defer { CFRelease(task) }
+        guard let value = SecTaskCopyValueForEntitlement(
+            task,
+            "keychain-access-groups" as CFString,
+            nil
+        ) else { return [] }
         return value as? [String] ?? []
     }
 }
@@ -31,7 +31,9 @@ enum AppDeepLink: Equatable {
     static func parse(_ url: URL) -> AppDeepLink? {
         guard url.scheme?.lowercased() == "claudeusagewidget" else { return nil }
         let target = "retry"
-        let matchesRetry = url.host?.lowercased() == target || url.path.lowercased() == "/\(target)"
+        let matchesHost = url.host?.lowercased() == target
+        let matchesPath = url.path.lowercased() == "/\(target)"
+        let matchesRetry = matchesHost || matchesPath
         return matchesRetry ? .retry : nil
     }
 }
