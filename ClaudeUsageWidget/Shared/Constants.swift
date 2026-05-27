@@ -1,13 +1,39 @@
 import Foundation
+import Security
 
 // Bundle / entitlement identifiers shared between the app and the widget extension.
-// These strings must match the entitlements files in Resources/.
+// These strings must match project.yml + entitlements in Resources/.
 enum BundleIdentifiers {
-    static let teamPrefix = "HR4LVL7TKY"
     static let base = "io.github.sergei-matheson.claudeusagewidget"
     static let appGroup = "group.\(base)"
-    static let keychainAccessGroup = "\(teamPrefix).\(base)"
+    // Derived from runtime signing entitlements to avoid hard-coding a Team ID.
+    static var keychainAccessGroup: String? {
+        Entitlements.keychainAccessGroups.first(where: { $0.hasSuffix(".\(base)") })
+    }
     static let keychainService = "\(base).session"
+}
+
+private enum Entitlements {
+    static var keychainAccessGroups: [String] {
+        guard let task = SecTaskCreateFromSelf(nil),
+              let value = SecTaskCopyValueForEntitlement(
+                  task,
+                  "keychain-access-groups" as CFString,
+                  nil
+              ) else { return [] }
+        return value as? [String] ?? []
+    }
+}
+
+enum AppDeepLink: Equatable {
+    case retry
+
+    static func parse(_ url: URL) -> AppDeepLink? {
+        guard url.scheme?.lowercased() == "claudeusagewidget" else { return nil }
+        if url.host?.lowercased() == "retry" { return .retry }
+        if url.path.lowercased() == "/retry" { return .retry }
+        return nil
+    }
 }
 
 // Timing knobs for the timeline policy. Surface them in one place so the

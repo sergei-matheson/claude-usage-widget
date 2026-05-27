@@ -100,4 +100,40 @@ final class SessionCredentialsTests: XCTestCase {
         XCTAssertEqual(decoded.sessionKey, "sk-from-json")
         XCTAssertEqual(decoded.organizationId, "org-from-json")
     }
+
+    func testTokenValidationRejectsCookieControlChars() {
+        XCTAssertFalse(SessionCredentials.isValidToken("abc;def"))
+        XCTAssertFalse(SessionCredentials.isValidToken("abc def"))
+        XCTAssertFalse(SessionCredentials.isValidToken("abc\n"))
+        XCTAssertTrue(SessionCredentials.isValidToken("sk-valid-token"))
+    }
+
+    func testOrganizationIdValidation() {
+        XCTAssertTrue(SessionCredentials.isValidOrganizationId(""))
+        XCTAssertTrue(SessionCredentials.isValidOrganizationId("1a2b3c4d-5e6f"))
+        XCTAssertFalse(SessionCredentials.isValidOrganizationId("../org"))
+        XCTAssertFalse(SessionCredentials.isValidOrganizationId("org id"))
+    }
+
+    func testNormalizationTrimsWhitespace() {
+        XCTAssertEqual(SessionCredentials.normalizeToken("  sk-abc \n"), "sk-abc")
+        XCTAssertEqual(SessionCredentials.normalizeOrganizationId(" org-1\t"), "org-1")
+    }
+
+    func testValidateInputReturnsNormalizedCredentials() {
+        let result = SessionCredentials.validateInput(token: "  sk-abc ", organizationId: " org-1 ")
+        XCTAssertEqual(result, .valid(token: "sk-abc", organizationId: "org-1"))
+    }
+
+    func testValidateInputReturnsStatusForInvalidCases() {
+        XCTAssertEqual(
+            SessionCredentials.validateInput(token: "bad token", organizationId: "").statusMessage,
+            "Session token contains invalid characters."
+        )
+        XCTAssertEqual(
+            SessionCredentials.validateInput(token: "sk-abc", organizationId: "../org").statusMessage,
+            "Organization ID must be alphanumeric (with dashes)."
+        )
+        XCTAssertNil(SessionCredentials.validateInput(token: "", organizationId: "").statusMessage)
+    }
 }

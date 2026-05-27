@@ -19,9 +19,14 @@ struct UsageService {
     }
 
     static let defaultSession: URLSession = {
-        let config = URLSessionConfiguration.default
+        // Authenticated requests should not persist cookies/cache to disk.
+        let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 15
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.urlCache = nil
+        config.httpCookieAcceptPolicy = .never
+        config.httpShouldSetCookies = false
         return URLSession(configuration: config)
     }()
 
@@ -69,10 +74,6 @@ struct UsageService {
         }
     }
 
-    // Claude org IDs are UUIDs. Anything else is rejected so a hostile org-ID value
-    // can't pivot the authenticated request to another claude.ai path.
-    static let organizationIdPattern = #/^[A-Za-z0-9-]{1,64}$/#
-
     // Retry-After is either a delay in seconds or an HTTP-date. We honor the seconds form;
     // an HTTP-date is rare from claude.ai and falls back to the policy default.
     static func parseRetryAfter(_ response: HTTPURLResponse) -> TimeInterval? {
@@ -86,7 +87,7 @@ struct UsageService {
         if credentials.organizationId.isEmpty {
             return URL(string: "https://claude.ai/api/usage")
         }
-        guard (try? Self.organizationIdPattern.wholeMatch(in: credentials.organizationId)) != nil else {
+        guard SessionCredentials.isValidOrganizationId(credentials.organizationId) else {
             return nil
         }
         var components = URLComponents()
@@ -107,16 +108,19 @@ private struct UsageAPIResponse: Codable {
     let sevenDay: UsageBucket?
 
     func toUsageData() -> UsageData {
-        let utilization = fiveHour?.utilization ?? 0
-        let sevenDayUtilization = sevenDay?.utilization ?? 0
-
         return UsageData(
-            fiveHourUtilization: Int(utilization.rounded()),
+            fiveHourUtilization: Self.normalizedPercent(fiveHour?.utilization),
             periodResetDate: Self.parseDate(fiveHour?.resetsAt),
-            sevenDayUtilization: Int(sevenDayUtilization.rounded()),
+            sevenDayUtilization: Self.normalizedPercent(sevenDay?.utilization),
             sevenDayResetDate: Self.parseDate(sevenDay?.resetsAt),
             lastUpdated: Date()
         )
+    }
+
+    private static func normalizedPercent(_ value: Double?) -> Int {
+        guard let value, value.isFinite else { return 0 }
+        let rounded = Int(value.rounded())
+        return min(max(rounded, 0), 100)
     }
 
     private static let isoFractional: ISO8601DateFormatter = {

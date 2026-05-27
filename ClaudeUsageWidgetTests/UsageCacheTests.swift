@@ -115,10 +115,9 @@ final class SharedConstantsTests: XCTestCase {
     func testBundleIdentifierComposition() {
         XCTAssertEqual(BundleIdentifiers.base, "io.github.sergei-matheson.claudeusagewidget")
         XCTAssertEqual(BundleIdentifiers.appGroup, "group.io.github.sergei-matheson.claudeusagewidget")
-        XCTAssertEqual(
-            BundleIdentifiers.keychainAccessGroup,
-            "HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget"
-        )
+        if let accessGroup = BundleIdentifiers.keychainAccessGroup {
+            XCTAssertTrue(accessGroup.hasSuffix(".io.github.sergei-matheson.claudeusagewidget"))
+        }
         XCTAssertEqual(BundleIdentifiers.keychainService, "io.github.sergei-matheson.claudeusagewidget.session")
     }
 
@@ -127,5 +126,22 @@ final class SharedConstantsTests: XCTestCase {
         XCTAssertEqual(RefreshPolicy.postResetInterval, 300)
         XCTAssertEqual(RefreshPolicy.rateLimitedFallback, 3600)
         XCTAssertEqual(RefreshPolicy.staleThreshold, RefreshPolicy.refreshInterval * 2)
+    }
+
+    final class AppDeepLinkTests: XCTestCase {
+        func testParseRetryByHost() {
+            let url = URL(string: "claudeusagewidget://retry")!
+            XCTAssertEqual(AppDeepLink.parse(url), .retry)
+        }
+
+        func testParseRetryByPath() {
+            let url = URL(string: "claudeusagewidget:///retry")!
+            XCTAssertEqual(AppDeepLink.parse(url), .retry)
+        }
+
+        func testRejectsUnknownURLs() {
+            XCTAssertNil(AppDeepLink.parse(URL(string: "https://claude.ai/retry")!))
+            XCTAssertNil(AppDeepLink.parse(URL(string: "claudeusagewidget://settings")!))
+        }
     }
 }
