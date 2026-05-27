@@ -203,13 +203,16 @@ final class UsageProviderTests: XCTestCase {
     func testSuccessReturnsLoadedEntry() async throws {
         try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: ""))
         StubURLProtocol.handler = { request in
-            let body = Data(#"{"five_hour":{"utilization":12.0,"resets_at":null}}"#.utf8)
+            let body = Data(
+                #"{"five_hour":{"utilization":12.0,"resets_at":null},"seven_day":{"utilization":7.0,"resets_at":null}}"#.utf8
+            )
             return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, body)
         }
 
         let timeline = await awaitTimeline(makeProvider())
         XCTAssertEqual(timeline.entries.first?.state, .loaded)
         XCTAssertEqual(timeline.entries.first?.usageData?.fiveHourUtilization, 12)
+        XCTAssertEqual(timeline.entries.first?.usageData?.sevenDayUtilization, 7)
     }
 
     func testRateLimitedWithRetryAfterSchedulesRetry() async throws {
