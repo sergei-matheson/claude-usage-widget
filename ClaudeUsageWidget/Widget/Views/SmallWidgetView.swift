@@ -8,9 +8,10 @@ struct SmallWidgetView: View {
     }
 
     private var timeUntilReset: String {
+        guard let reset = usage.periodResetDate else { return "Reset time unknown" }
         let now = Date()
-        guard usage.periodResetDate > now else { return "Resetting…" }
-        let components = Calendar.current.dateComponents([.day, .hour, .minute], from: now, to: usage.periodResetDate)
+        guard reset > now else { return "Resetting…" }
+        let components = Calendar.current.dateComponents([.day, .hour, .minute], from: now, to: reset)
         let days = components.day ?? 0
         let hours = components.hour ?? 0
         let minutes = components.minute ?? 0
@@ -60,9 +61,10 @@ struct SmallWidgetView: View {
     }
 
     private var resetLabel: some View {
-        Text(timeUntilReset)
+        let isOverdue = (usage.periodResetDate.map { $0 < Date() }) ?? false
+        return Text(timeUntilReset)
             .font(.caption2)
-            .foregroundStyle(usage.periodResetDate < Date() ? .orange : .secondary)
+            .foregroundStyle(isOverdue ? .orange : .secondary)
     }
 
     private var staleLabel: some View {

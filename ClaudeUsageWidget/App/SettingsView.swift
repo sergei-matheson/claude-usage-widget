@@ -53,6 +53,12 @@ struct SettingsView: View {
         let trimmedOrg = organizationId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedToken.isEmpty else { return }
 
+        // Reject anything that could smuggle a CRLF or terminator into the Cookie header.
+        if trimmedToken.rangeOfCharacter(from: SettingsView.invalidTokenCharacters) != nil {
+            statusMessage = "Session token contains invalid characters."
+            return
+        }
+
         if !trimmedOrg.isEmpty,
            (try? UsageService.organizationIdPattern.wholeMatch(in: trimmedOrg)) == nil {
             statusMessage = "Organization ID must be alphanumeric (with dashes)."
@@ -69,6 +75,14 @@ struct SettingsView: View {
             statusMessage = "Failed to save credentials."
         }
     }
+
+    // Control chars + Cookie-separator characters that have no business inside a session token.
+    private static let invalidTokenCharacters: CharacterSet = {
+        var set = CharacterSet.controlCharacters
+        set.insert(charactersIn: ";,\"\\")
+        set.formUnion(.whitespacesAndNewlines)
+        return set
+    }()
 
     private func clearCredentials() {
         do {

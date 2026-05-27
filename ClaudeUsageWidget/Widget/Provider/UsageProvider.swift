@@ -2,9 +2,19 @@ import WidgetKit
 import Foundation
 
 struct UsageProvider: TimelineProvider {
-    private let service = UsageService()
-    private let keychain = KeychainStore()
-    private let cache = UsageCache()
+    private let service: UsageService
+    private let keychain: KeychainStore
+    private let cache: UsageCache
+
+    init(
+        service: UsageService = UsageService(),
+        keychain: KeychainStore = KeychainStore(),
+        cache: UsageCache = UsageCache()
+    ) {
+        self.service = service
+        self.keychain = keychain
+        self.cache = cache
+    }
 
     func placeholder(in context: Context) -> UsageEntry {
         .placeholder()
@@ -38,9 +48,12 @@ struct UsageProvider: TimelineProvider {
                 try? cache.save(usage)
 
                 // If the period has already reset, check again soon
-                let policy: TimelineReloadPolicy = usage.periodResetDate < Date()
-                    ? .after(Date().addingTimeInterval(300))
-                    : .after(nextRefresh)
+                let policy: TimelineReloadPolicy
+                if let reset = usage.periodResetDate, reset < Date() {
+                    policy = .after(Date().addingTimeInterval(300))
+                } else {
+                    policy = .after(nextRefresh)
+                }
 
                 let entry = UsageEntry(date: Date(), usageData: usage, state: .loaded)
                 completion(Timeline(entries: [entry], policy: policy))

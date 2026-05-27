@@ -2,9 +2,9 @@ import Foundation
 
 struct UsageData: Codable, Equatable {
     let fiveHourUtilization: Int
-    let periodResetDate: Date
+    let periodResetDate: Date?
     let sevenDayUtilization: Int
-    let sevenDayResetDate: Date
+    let sevenDayResetDate: Date?
     let lastUpdated: Date
 
     static func placeholder() -> UsageData {
