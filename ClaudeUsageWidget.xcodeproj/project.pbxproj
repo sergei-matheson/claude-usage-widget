@@ -11,6 +11,7 @@
 		205B31AEA33250771BC5C797 /* ClaudeUsageWidgetApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA74994D6524B1C0369293E1 /* ClaudeUsageWidgetApp.swift */; };
 		20F270EC268A0B7504459A94 /* EntryState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC0303452D99B6E4CE967B7 /* EntryState.swift */; };
 		2684F715C028B4B2BEB64169 /* UsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE6388246DF4DF751B02B74 /* UsageService.swift */; };
+		28012EFD9ADE087E21163178 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B05BD6A405C98C88399D38E /* Constants.swift */; };
 		2ED688F2E82A14356C3CE6D7 /* EntryState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC0303452D99B6E4CE967B7 /* EntryState.swift */; };
 		3059A2696AC9733CFBEE5BB0 /* SmallWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13FABF54B19D3AD5C2492B3F /* SmallWidgetView.swift */; };
 		307AD22601BF0E3D6364BA16 /* UsageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302FA9DC8011AFC535C990D2 /* UsageCache.swift */; };
@@ -25,10 +26,12 @@
 		7C4CC244862D05CAD02BF74B /* UsageEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF07755D3596C5BB5CC26D17 /* UsageEntry.swift */; };
 		7EC778676EAB1A5CA73C0FC5 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6B2B16CD5F4A3B2D640C3012 /* WidgetKit.framework */; };
 		85B9A47A24F5BFF1137A2B9A /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB22D10AA358CF4828F9A989 /* KeychainStore.swift */; };
+		86F21D95420029B34365DCD9 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B05BD6A405C98C88399D38E /* Constants.swift */; };
 		909F2B5DC8179DBDF275F063 /* UsageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE6B776B2D854C43572286A /* UsageData.swift */; };
 		999A86B8FABD98701E34D21C /* WidgetEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50B95FC104FF2EA874AB4DF2 /* WidgetEntryView.swift */; };
 		9E96B9376FB18EA8B8964B51 /* ClaudeUsageWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B71813093F86943308852F96 /* ClaudeUsageWidgetExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A0AB1BD1919DAC20D0066CF8 /* UsageServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD395ED69FE96C6A6AAB52F /* UsageServiceTests.swift */; };
+		A54842633E8EE299533C7DF6 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B05BD6A405C98C88399D38E /* Constants.swift */; };
 		AA0BB07C39C9A301D6AAB684 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB22D10AA358CF4828F9A989 /* KeychainStore.swift */; };
 		AEF2D2A43E3F4B041A634D95 /* UsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE6388246DF4DF751B02B74 /* UsageService.swift */; };
 		AFB0D49C1C045431E164D1F9 /* UsageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302FA9DC8011AFC535C990D2 /* UsageCache.swift */; };
@@ -78,6 +81,7 @@
 		13FABF54B19D3AD5C2492B3F /* SmallWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmallWidgetView.swift; sourceTree = "<group>"; };
 		2E9EF629901C111918BF9917 /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
 		302FA9DC8011AFC535C990D2 /* UsageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCache.swift; sourceTree = "<group>"; };
+		3B05BD6A405C98C88399D38E /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		428A90E6A15D3420140BC9BF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		50B95FC104FF2EA874AB4DF2 /* WidgetEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetEntryView.swift; sourceTree = "<group>"; };
 		6017C6A2CF44157BD967FD75 /* ClaudeUsageWidgetApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClaudeUsageWidgetApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -235,6 +239,7 @@
 		F84A2487CCB14261949B7CBA /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				3B05BD6A405C98C88399D38E /* Constants.swift */,
 				F2FA83F38B79193B67F4D837 /* Models */,
 				5520ED903B9CCFC80B0EE805 /* Services */,
 			);
@@ -368,6 +373,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A54842633E8EE299533C7DF6 /* Constants.swift in Sources */,
 				EBBB450900C759DC6CEC4548 /* EntryState.swift in Sources */,
 				85B9A47A24F5BFF1137A2B9A /* KeychainStore.swift in Sources */,
 				C6FA7297826F3B57745187D1 /* KeychainStoreTests.swift in Sources */,
@@ -387,6 +393,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				205B31AEA33250771BC5C797 /* ClaudeUsageWidgetApp.swift in Sources */,
+				86F21D95420029B34365DCD9 /* Constants.swift in Sources */,
 				2ED688F2E82A14356C3CE6D7 /* EntryState.swift in Sources */,
 				AA0BB07C39C9A301D6AAB684 /* KeychainStore.swift in Sources */,
 				BC0451C8C64C51D669C6545B /* SessionCredentials.swift in Sources */,
@@ -403,6 +410,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6090754AE05791468FE87492 /* ClaudeUsageWidget.swift in Sources */,
+				28012EFD9ADE087E21163178 /* Constants.swift in Sources */,
 				20F270EC268A0B7504459A94 /* EntryState.swift in Sources */,
 				C28183C2ADE91B4C841579DC /* ErrorView.swift in Sources */,
 				EF17D39C5D298ECFF847D4A5 /* KeychainStore.swift in Sources */,
