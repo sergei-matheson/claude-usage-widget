@@ -21,7 +21,7 @@ struct SmallWidgetView: View {
     }
 
     private var isStale: Bool {
-        Date().timeIntervalSince(usage.lastUpdated) > 1800
+        Date().timeIntervalSince(usage.lastUpdated) > RefreshPolicy.staleThreshold
     }
 
     var body: some View {

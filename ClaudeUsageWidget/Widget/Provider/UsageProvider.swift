@@ -41,16 +41,15 @@ struct UsageProvider: TimelineProvider {
                 return
             }
 
-            let nextRefresh = Date().addingTimeInterval(1800)  // 30 minutes
+            let nextRefresh = Date().addingTimeInterval(RefreshPolicy.refreshInterval)
 
             do {
                 let usage = try await service.fetchUsage(credentials: credentials)
                 try? cache.save(usage)
 
-                // If the period has already reset, check again soon
                 let policy: TimelineReloadPolicy
                 if let reset = usage.periodResetDate, reset < Date() {
-                    policy = .after(Date().addingTimeInterval(300))
+                    policy = .after(Date().addingTimeInterval(RefreshPolicy.postResetInterval))
                 } else {
                     policy = .after(nextRefresh)
                 }
@@ -59,19 +58,20 @@ struct UsageProvider: TimelineProvider {
                 completion(Timeline(entries: [entry], policy: policy))
             } catch UsageServiceError.unauthenticated {
                 completion(Timeline(entries: [.unauthenticated()], policy: .never))
-            } catch UsageServiceError.unexpectedResponse(429) {
-                // Rate limited: back off to 60 minutes
-                let laterRefresh = Date().addingTimeInterval(3600)
+            } catch UsageServiceError.rateLimited(let retryAfter) {
+                let delay = retryAfter ?? RefreshPolicy.rateLimitedFallback
+                let laterRefresh = Date().addingTimeInterval(delay)
                 if let stale = cache.load() {
                     completion(Timeline(entries: [UsageEntry(date: Date(), usageData: stale, state: .loaded)], policy: .after(laterRefresh)))
                 } else {
-                    completion(Timeline(entries: [.error("Rate limited. Retrying in 1 hour.")], policy: .after(laterRefresh)))
+                    completion(Timeline(entries: [.error("Rate limited. Retrying soon.")], policy: .after(laterRefresh)))
                 }
             } catch {
                 if let stale = cache.load() {
                     completion(Timeline(entries: [UsageEntry(date: Date(), usageData: stale, state: .loaded)], policy: .after(nextRefresh)))
                 } else {
-                    completion(Timeline(entries: [.error(error.localizedDescription)], policy: .after(nextRefresh)))
+                    // Fixed user-facing string so URLError details (proxy, host hints) can't leak.
+                    completion(Timeline(entries: [.error("Couldn't reach claude.ai")], policy: .after(nextRefresh)))
                 }
             }
         }
