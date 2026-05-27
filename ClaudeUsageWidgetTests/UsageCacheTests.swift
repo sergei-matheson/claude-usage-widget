@@ -115,9 +115,9 @@ final class SharedConstantsTests: XCTestCase {
     func testBundleIdentifierComposition() {
         XCTAssertEqual(BundleIdentifiers.base, "io.github.sergei-matheson.claudeusagewidget")
         XCTAssertEqual(BundleIdentifiers.appGroup, "group.io.github.sergei-matheson.claudeusagewidget")
-        if let accessGroup = BundleIdentifiers.keychainAccessGroup {
-            XCTAssertTrue(accessGroup.hasSuffix(".io.github.sergei-matheson.claudeusagewidget"))
-        }
+        let accessGroup = BundleIdentifiers.keychainAccessGroup
+        XCTAssertNotNil(accessGroup)
+        XCTAssertTrue(accessGroup?.hasSuffix(".io.github.sergei-matheson.claudeusagewidget") == true)
         XCTAssertEqual(BundleIdentifiers.keychainService, "io.github.sergei-matheson.claudeusagewidget.session")
     }
 

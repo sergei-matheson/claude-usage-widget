@@ -7,6 +7,7 @@ enum BundleIdentifiers {
     static let base = "io.github.sergei-matheson.claudeusagewidget"
     static let appGroup = "group.\(base)"
     // Derived from runtime signing entitlements to avoid hard-coding a Team ID.
+    // Cached at this static-let consumer.
     static let keychainAccessGroup: String? =
         Entitlements.keychainAccessGroups.first(where: { $0.hasSuffix(".\(base)") })
     static let keychainService = "\(base).session"
@@ -32,6 +33,7 @@ enum AppDeepLink: Equatable {
         guard url.scheme?.lowercased() == "claudeusagewidget" else { return nil }
         let target = "retry"
         let matchesHost = url.host?.lowercased() == target
+        // Accept both host and path forms for compatibility with already-shipped deep links.
         let matchesPath = url.path.lowercased() == "/\(target)"
         let matchesRetry = matchesHost || matchesPath
         return matchesRetry ? .retry : nil

@@ -31,22 +31,22 @@ final class UsageServiceTests: XCTestCase {
           "five_hour": { "utilization": 15.6, "resets_at": null },
           "seven_day": { "utilization": 2.4, "resets_at": null }
         }
-
-        func testClampsUtilizationToValidRange() throws {
-            let json = """
-            {
-              "five_hour": { "utilization": 135.2, "resets_at": null },
-              "seven_day": { "utilization": -8.4, "resets_at": null }
-            }
-            """
-            let usage = try UsageService.parse(data: makeData(json))
-            XCTAssertEqual(usage.fiveHourUtilization, 100)
-            XCTAssertEqual(usage.sevenDayUtilization, 0)
-        }
         """
         let usage = try UsageService.parse(data: makeData(json))
         XCTAssertEqual(usage.fiveHourUtilization, 16)
         XCTAssertEqual(usage.sevenDayUtilization, 2)
+    }
+
+    func testClampsUtilizationToValidRange() throws {
+        let json = """
+        {
+          "five_hour": { "utilization": 135.2, "resets_at": null },
+          "seven_day": { "utilization": -8.4, "resets_at": null }
+        }
+        """
+        let usage = try UsageService.parse(data: makeData(json))
+        XCTAssertEqual(usage.fiveHourUtilization, 100)
+        XCTAssertEqual(usage.sevenDayUtilization, 0)
     }
 
     func testParsesFractionalSecondsResetDate() throws {

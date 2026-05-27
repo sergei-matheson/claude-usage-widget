@@ -260,6 +260,7 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(timeline.entries.first?.usageData?.fiveHourUtilization, 77)
         if case .after(let date) = timeline.policy {
             XCTAssertGreaterThanOrEqual(date.timeIntervalSinceNow, RefreshPolicy.rateLimitedFallback - toleranceSeconds)
+            XCTAssertLessThanOrEqual(date.timeIntervalSinceNow, RefreshPolicy.rateLimitedFallback + toleranceSeconds)
         } else {
             XCTFail("expected .after policy")
         }

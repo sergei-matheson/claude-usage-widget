@@ -109,7 +109,7 @@ final class SessionCredentialsTests: XCTestCase {
     }
 
     func testOrganizationIdValidation() {
-        XCTAssertTrue(SessionCredentials.isValidOrganizationId(""))
+        XCTAssertFalse(SessionCredentials.isValidOrganizationId(""))
         XCTAssertTrue(SessionCredentials.isValidOrganizationId("1a2b3c4d-5e6f"))
         XCTAssertFalse(SessionCredentials.isValidOrganizationId("../org"))
         XCTAssertFalse(SessionCredentials.isValidOrganizationId("org id"))

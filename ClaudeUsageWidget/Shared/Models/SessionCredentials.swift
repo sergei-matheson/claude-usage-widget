@@ -46,7 +46,7 @@ struct SessionCredentials: Codable {
     }
 
     static func isValidOrganizationId(_ organizationId: String) -> Bool {
-        organizationId.isEmpty || (try? organizationIdPattern.wholeMatch(in: organizationId)) != nil
+        (try? organizationIdPattern.wholeMatch(in: organizationId)) != nil
     }
 
     static func validateInput(token: String, organizationId: String) -> CredentialsValidationResult {
@@ -54,7 +54,7 @@ struct SessionCredentials: Codable {
         let normalizedOrg = normalizeOrganizationId(organizationId)
         guard !normalizedToken.isEmpty else { return .emptyToken }
         guard isValidToken(normalizedToken) else { return .invalidToken }
-        guard isValidOrganizationId(normalizedOrg) else { return .invalidOrganizationId }
+        guard normalizedOrg.isEmpty || isValidOrganizationId(normalizedOrg) else { return .invalidOrganizationId }
         return .valid(token: normalizedToken, organizationId: normalizedOrg)
     }
 }
