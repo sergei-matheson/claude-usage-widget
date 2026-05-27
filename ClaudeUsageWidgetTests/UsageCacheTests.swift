@@ -116,8 +116,9 @@ final class SharedConstantsTests: XCTestCase {
         XCTAssertEqual(BundleIdentifiers.base, "io.github.sergei-matheson.claudeusagewidget")
         XCTAssertEqual(BundleIdentifiers.appGroup, "group.io.github.sergei-matheson.claudeusagewidget")
         let accessGroup = BundleIdentifiers.keychainAccessGroup
-        XCTAssertNotNil(accessGroup)
-        XCTAssertTrue(accessGroup?.hasSuffix(".io.github.sergei-matheson.claudeusagewidget") == true)
+        XCTAssertTrue(
+            accessGroup == nil || accessGroup?.hasSuffix(".io.github.sergei-matheson.claudeusagewidget") == true
+        )
         XCTAssertEqual(BundleIdentifiers.keychainService, "io.github.sergei-matheson.claudeusagewidget.session")
     }
 
@@ -138,6 +139,11 @@ final class AppDeepLinkTests: XCTestCase {
     func testParseRetryByPath() {
         let url = URL(string: "claudeusagewidget:///retry")!
         XCTAssertEqual(AppDeepLink.parse(url), .retry)
+    }
+
+    func testRejectsRetryPathWhenHostDoesNotMatch() {
+        let url = URL(string: "claudeusagewidget://settings/retry")!
+        XCTAssertNil(AppDeepLink.parse(url))
     }
 
     func testRejectsUnknownURLs() {

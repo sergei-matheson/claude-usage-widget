@@ -7,23 +7,30 @@ enum BundleIdentifiers {
     static let base = "io.github.sergei-matheson.claudeusagewidget"
     static let appGroup = "group.\(base)"
     // Derived from runtime signing entitlements to avoid hard-coding a Team ID.
-    // Cached at this static-let consumer.
     static let keychainAccessGroup: String? =
         Entitlements.keychainAccessGroups.first(where: { $0.hasSuffix(".\(base)") })
     static let keychainService = "\(base).session"
 }
 
 private enum Entitlements {
-    static var keychainAccessGroups: [String] {
+    static let keychainAccessGroups: [String] = {
         guard let task = SecTaskCreateFromSelf(nil) else { return [] }
-        defer { CFRelease(task) }
         guard let value = SecTaskCopyValueForEntitlement(
             task,
             "keychain-access-groups" as CFString,
             nil
         ) else { return [] }
-        return value as? [String] ?? []
-    }
+        if let groups = value as? [String] {
+            return groups
+        }
+        assertionFailure(
+            "Expected array or string for keychain-access-groups entitlement, got \(String(describing: type(of: value))). Check entitlements configuration."
+        )
+        if let group = value as? String {
+            return [group]
+        }
+        return []
+    }()
 }
 
 enum AppDeepLink: Equatable {
@@ -35,7 +42,8 @@ enum AppDeepLink: Equatable {
         let matchesHost = url.host?.lowercased() == target
         // Accept both host and path forms for compatibility with already-shipped deep links.
         let matchesPath = url.path.lowercased() == "/\(target)"
-        let matchesRetry = matchesHost || matchesPath
+        let matchesPathOnly = (url.host == nil || url.host?.isEmpty == true) && matchesPath
+        let matchesRetry = matchesHost || matchesPathOnly
         return matchesRetry ? .retry : nil
     }
 }

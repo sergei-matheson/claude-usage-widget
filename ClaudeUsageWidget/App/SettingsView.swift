@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var statusClearTask: Task<Void, Never>?
 
     private let keychain = KeychainStore()
+    private var isSaveDisabled: Bool { SessionCredentials.normalizeToken(sessionToken).isEmpty }
 
     var body: some View {
         Form {
@@ -32,7 +33,7 @@ struct SettingsView: View {
 
             Section {
                 Button("Save") { saveCredentials() }
-                    .disabled(sessionToken.isEmpty)
+                    .disabled(isSaveDisabled)
 
                 Button("Clear", role: .destructive) { clearCredentials() }
                     .disabled(!hasSavedToken)

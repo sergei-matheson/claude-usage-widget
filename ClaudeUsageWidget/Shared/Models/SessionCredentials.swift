@@ -8,7 +8,9 @@ enum CredentialsValidationResult: Equatable {
 
     var statusMessage: String? {
         switch self {
-        case .emptyToken, .valid:
+        case .emptyToken:
+            return "Session token can't be blank."
+        case .valid:
             return nil
         case .invalidToken:
             return "Session token contains invalid characters."
@@ -22,6 +24,8 @@ struct SessionCredentials: Codable {
     let sessionKey: String
     let organizationId: String
 
+    // Claude org IDs are UUIDs. Anything else is rejected so a hostile org-ID value
+    // can't pivot the authenticated request to another claude.ai path.
     static let organizationIdPattern = #/^[A-Za-z0-9-]{1,64}$/#
 
     static let invalidTokenCharacters: CharacterSet = {
@@ -33,12 +37,16 @@ struct SessionCredentials: Codable {
         return set
     }()
 
+    private static func normalize(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     static func normalizeToken(_ token: String) -> String {
-        token.trimmingCharacters(in: .whitespacesAndNewlines)
+        normalize(token)
     }
 
     static func normalizeOrganizationId(_ organizationId: String) -> String {
-        organizationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        normalize(organizationId)
     }
 
     static func isValidToken(_ token: String) -> Bool {

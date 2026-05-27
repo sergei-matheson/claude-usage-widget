@@ -134,6 +134,9 @@ final class SessionCredentialsTests: XCTestCase {
             SessionCredentials.validateInput(token: "sk-abc", organizationId: "../org").statusMessage,
             "Organization ID must be alphanumeric (with dashes)."
         )
-        XCTAssertNil(SessionCredentials.validateInput(token: "", organizationId: "").statusMessage)
+        XCTAssertEqual(
+            SessionCredentials.validateInput(token: "", organizationId: "").statusMessage,
+            "Session token can't be blank."
+        )
     }
 }

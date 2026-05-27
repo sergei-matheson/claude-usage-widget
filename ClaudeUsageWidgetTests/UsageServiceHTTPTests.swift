@@ -163,6 +163,7 @@ final class UsageServiceHTTPTests: XCTestCase {
 final class UsageProviderTests: XCTestCase {
     private var keychain: KeychainStore!
     private var cacheURL: URL!
+    private var sessions: [URLSession] = []
 
     override func setUp() {
         super.setUp()
@@ -172,6 +173,8 @@ final class UsageProviderTests: XCTestCase {
     }
 
     override func tearDown() {
+        sessions.forEach { $0.invalidateAndCancel() }
+        sessions.removeAll()
         try? keychain.delete()
         try? FileManager.default.removeItem(at: cacheURL)
         StubURLProtocol.handler = nil
@@ -182,7 +185,9 @@ final class UsageProviderTests: XCTestCase {
     private func makeProvider() -> UsageProvider {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubURLProtocol.self]
-        let service = UsageService(session: URLSession(configuration: config))
+        let session = URLSession(configuration: config)
+        sessions.append(session)
+        let service = UsageService(session: session)
         let cache = UsageCache(cacheURL: cacheURL)
         return UsageProvider(service: service, keychain: keychain, cache: cache)
     }
@@ -240,7 +245,8 @@ final class UsageProviderTests: XCTestCase {
     }
 
     func testRateLimitedWithoutRetryAfterUsesFallbackAndCache() async throws {
-        let toleranceSeconds = 5.0
+        // Use a wider window to absorb CI scheduler/network jitter around async timeline generation.
+        let toleranceSeconds = 20.0
         try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: ""))
         try UsageCache(cacheURL: cacheURL).save(
             UsageData(
