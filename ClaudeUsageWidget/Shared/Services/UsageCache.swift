@@ -1,14 +1,21 @@
 import Foundation
 
 struct UsageCache {
-    private let appGroupID = "group.io.github.sergei-matheson.claudeusagewidget"
-    private let fileName = "usage_cache.json"
-    private let maxCacheAge: TimeInterval = 86400  // 24 hours
+    static let appGroupID = "group.io.github.sergei-matheson.claudeusagewidget"
+    static let defaultFileName = "usage_cache.json"
+    static let maxCacheAge: TimeInterval = 86400  // 24 hours
 
-    private var cacheURL: URL? {
-        FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroupID)?
-            .appendingPathComponent(fileName)
+    private let cacheURL: URL?
+
+    init() {
+        self.cacheURL = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupID)?
+            .appendingPathComponent(Self.defaultFileName)
+    }
+
+    // Test seam: write to an arbitrary location instead of the App Group container.
+    init(cacheURL: URL) {
+        self.cacheURL = cacheURL
     }
 
     func save(_ data: UsageData) throws {
@@ -23,7 +30,7 @@ struct UsageCache {
               let usage = try? JSONDecoder.usageDecoder.decode(UsageData.self, from: raw)
         else { return nil }
 
-        guard Date().timeIntervalSince(usage.lastUpdated) < maxCacheAge else { return nil }
+        guard Date().timeIntervalSince(usage.lastUpdated) < Self.maxCacheAge else { return nil }
         return usage
     }
 }

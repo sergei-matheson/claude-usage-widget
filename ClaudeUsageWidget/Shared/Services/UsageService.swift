@@ -11,7 +11,13 @@ enum UsageServiceError: Error {
 struct UsageService {
     // The claude.ai usage endpoint is undocumented. Verify the exact path by inspecting
     // network traffic on https://claude.ai/settings/usage before shipping.
-    private let session: URLSession = {
+    private let session: URLSession
+
+    init(session: URLSession = UsageService.defaultSession) {
+        self.session = session
+    }
+
+    static let defaultSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 15
@@ -87,25 +93,31 @@ struct UsageAPIResponse: Codable {
 
     func toUsageData() -> UsageData {
         let utilization = fiveHour?.utilization ?? 0
-        let resetDate = parseDate(fiveHour?.resetsAt) ?? Date().addingTimeInterval(3600 * 5)
         let sevenDayUtilization = sevenDay?.utilization ?? 0
-        let sevenDayResetDate = parseDate(sevenDay?.resetsAt) ?? Date().addingTimeInterval(86400 * 7)
 
         return UsageData(
             fiveHourUtilization: Int(utilization.rounded()),
-            periodResetDate: resetDate,
+            periodResetDate: Self.parseDate(fiveHour?.resetsAt),
             sevenDayUtilization: Int(sevenDayUtilization.rounded()),
-            sevenDayResetDate: sevenDayResetDate,
+            sevenDayResetDate: Self.parseDate(sevenDay?.resetsAt),
             lastUpdated: Date()
         )
     }
 
-    private func parseDate(_ string: String?) -> Date? {
+    private static let isoFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let isoBasic: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    private static func parseDate(_ string: String?) -> Date? {
         guard let string else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: string) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: string)
+        return isoFractional.date(from: string) ?? isoBasic.date(from: string)
     }
 }
