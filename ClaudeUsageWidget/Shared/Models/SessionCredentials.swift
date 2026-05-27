@@ -26,7 +26,8 @@ struct SessionCredentials: Codable {
 
     static let invalidTokenCharacters: CharacterSet = {
         var set = CharacterSet.controlCharacters
-        // Cookie header separators/quoting chars that can break parsing or enable header smuggling.
+        // Cookie separators + quoting characters + literal backslash.
+        // Blocking "\" avoids ambiguous escape-like token content in header construction.
         set.insert(charactersIn: ";,\"\\")
         set.formUnion(.whitespacesAndNewlines)
         return set
