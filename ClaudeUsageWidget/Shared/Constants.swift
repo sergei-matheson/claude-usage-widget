@@ -20,6 +20,7 @@ private enum Entitlements {
                   "keychain-access-groups" as CFString,
                   nil
               ) else { return [] }
+        defer { CFRelease(task) }
         return value as? [String] ?? []
     }
 }

@@ -240,6 +240,7 @@ final class UsageProviderTests: XCTestCase {
     }
 
     func testRateLimitedWithoutRetryAfterUsesFallbackAndCache() async throws {
+        let toleranceSeconds = 5.0
         try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: ""))
         try UsageCache(cacheURL: cacheURL).save(
             UsageData(
@@ -258,7 +259,7 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(timeline.entries.first?.state, .loaded)
         XCTAssertEqual(timeline.entries.first?.usageData?.fiveHourUtilization, 77)
         if case .after(let date) = timeline.policy {
-            XCTAssertGreaterThanOrEqual(date.timeIntervalSinceNow, RefreshPolicy.rateLimitedFallback - 5)
+            XCTAssertGreaterThanOrEqual(date.timeIntervalSinceNow, RefreshPolicy.rateLimitedFallback - toleranceSeconds)
         } else {
             XCTFail("expected .after policy")
         }
