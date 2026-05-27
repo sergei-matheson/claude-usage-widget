@@ -13,6 +13,7 @@ final class UsageServiceHTTPTests: XCTestCase {
 
     override func tearDown() {
         StubURLProtocol.handler = nil
+        StubURLProtocol.error = nil
         super.tearDown()
     }
 
@@ -137,17 +138,42 @@ final class UsageServiceHTTPTests: XCTestCase {
             }
         }
     }
+
+    func testWrapsNetworkErrors() async {
+        StubURLProtocol.error = URLError(.timedOut)
+        await XCTAssertThrowsErrorAsync(try await self.makeService().fetchUsage(credentials: self.creds)) { error in
+            guard case UsageServiceError.networkError = error else {
+                return XCTFail("expected .networkError, got \(error)")
+            }
+        }
+    }
+
+    func testSendsUserAgentHeader() async throws {
+        let observedHeaders = LockedBox<[String: String]>()
+        StubURLProtocol.handler = { request in
+            observedHeaders.value = request.allHTTPHeaderFields ?? [:]
+            let body = Data(#"{"five_hour":{"utilization":0,"resets_at":null}}"#.utf8)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, body)
+        }
+        _ = try await makeService().fetchUsage(credentials: creds)
+        XCTAssertEqual(observedHeaders.value?["User-Agent"], "ClaudeUsageWidget/1.0 macOS")
+    }
 }
 
 // MARK: - URLProtocol stub
 
 private final class StubURLProtocol: URLProtocol {
     static var handler: ((URLRequest) -> (HTTPURLResponse, Data))?
+    static var error: Error?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        if let error = StubURLProtocol.error {
+            client?.urlProtocol(self, didFailWithError: error)
+            return
+        }
         guard let handler = StubURLProtocol.handler else {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL))
             return

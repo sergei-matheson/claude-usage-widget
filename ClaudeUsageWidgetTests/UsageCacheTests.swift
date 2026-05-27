@@ -78,3 +78,54 @@ final class UsageCacheTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: tempURL.path))
     }
 }
+
+final class UsageDataModelTests: XCTestCase {
+    func testPlaceholderHasExpectedShape() {
+        let placeholder = UsageData.placeholder()
+        XCTAssertEqual(placeholder.fiveHourUtilization, 42)
+        XCTAssertEqual(placeholder.sevenDayUtilization, 18)
+    }
+
+    func testPlaceholderDatesAreInTheFuture() {
+        let now = Date()
+        let placeholder = UsageData.placeholder()
+        guard let periodResetDate = placeholder.periodResetDate,
+              let sevenDayResetDate = placeholder.sevenDayResetDate else {
+            return XCTFail("placeholder reset dates should not be nil")
+        }
+        XCTAssertGreaterThan(periodResetDate, now)
+        XCTAssertGreaterThan(sevenDayResetDate, now)
+    }
+
+    func testUsageDataCodableRoundTripPreservesOptionalDates() throws {
+        let original = UsageData(
+            fiveHourUtilization: 10,
+            periodResetDate: nil,
+            sevenDayUtilization: 4,
+            sevenDayResetDate: nil,
+            lastUpdated: Date(timeIntervalSince1970: 2_000_000)
+        )
+        let data = try JSONEncoder.usageEncoder.encode(original)
+        let decoded = try JSONDecoder.usageDecoder.decode(UsageData.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+}
+
+final class SharedConstantsTests: XCTestCase {
+    func testBundleIdentifierComposition() {
+        XCTAssertEqual(BundleIdentifiers.base, "io.github.sergei-matheson.claudeusagewidget")
+        XCTAssertEqual(BundleIdentifiers.appGroup, "group.io.github.sergei-matheson.claudeusagewidget")
+        XCTAssertEqual(
+            BundleIdentifiers.keychainAccessGroup,
+            "HR4LVL7TKY.io.github.sergei-matheson.claudeusagewidget"
+        )
+        XCTAssertEqual(BundleIdentifiers.keychainService, "io.github.sergei-matheson.claudeusagewidget.session")
+    }
+
+    func testRefreshPolicyIntervals() {
+        XCTAssertEqual(RefreshPolicy.refreshInterval, 1800)
+        XCTAssertEqual(RefreshPolicy.postResetInterval, 300)
+        XCTAssertEqual(RefreshPolicy.rateLimitedFallback, 3600)
+        XCTAssertEqual(RefreshPolicy.staleThreshold, RefreshPolicy.refreshInterval * 2)
+    }
+}

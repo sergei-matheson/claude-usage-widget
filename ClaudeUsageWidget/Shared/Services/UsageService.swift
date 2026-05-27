@@ -14,25 +14,16 @@ struct UsageService {
     // network traffic on https://claude.ai/settings/usage before shipping.
     private let session: URLSession
 
-<<<<<<< HEAD
-    init() {
-=======
     init(session: URLSession = UsageService.defaultSession) {
         self.session = session
     }
 
     static let defaultSession: URLSession = {
->>>>>>> origin/main
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 15
-        self.session = URLSession(configuration: config)
-    }
-
-    // Internal init for testing — allows injecting a mock URLSession
-    init(session: URLSession) {
-        self.session = session
-    }
+        return URLSession(configuration: config)
+    }()
 
     func fetchUsage(credentials: SessionCredentials) async throws -> UsageData {
         guard let url = buildURL(credentials: credentials) else {
