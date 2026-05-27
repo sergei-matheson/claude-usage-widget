@@ -1,13 +1,51 @@
 import Foundation
+import Security
 
 // Bundle / entitlement identifiers shared between the app and the widget extension.
-// These strings must match the entitlements files in Resources/.
+// These strings must match project.yml + entitlements in Resources/.
 enum BundleIdentifiers {
-    static let teamPrefix = "HR4LVL7TKY"
     static let base = "io.github.sergei-matheson.claudeusagewidget"
     static let appGroup = "group.\(base)"
-    static let keychainAccessGroup = "\(teamPrefix).\(base)"
+    // Derived from runtime signing entitlements to avoid hard-coding a Team ID.
+    static let keychainAccessGroup: String? =
+        Entitlements.keychainAccessGroups.first(where: { $0.hasSuffix(".\(base)") })
     static let keychainService = "\(base).session"
+}
+
+private enum Entitlements {
+    static let keychainAccessGroups: [String] = {
+        guard let task = SecTaskCreateFromSelf(nil) else { return [] }
+        guard let value = SecTaskCopyValueForEntitlement(
+            task,
+            "keychain-access-groups" as CFString,
+            nil
+        ) else { return [] }
+        if let groups = value as? [String] {
+            return groups
+        }
+        if let group = value as? String {
+            return [group]
+        }
+        assertionFailure(
+            "Expected array or string for keychain-access-groups entitlement, got \(String(describing: type(of: value))). Check entitlements configuration."
+        )
+        return []
+    }()
+}
+
+enum AppDeepLink: Equatable {
+    case retry
+
+    static func parse(_ url: URL) -> AppDeepLink? {
+        guard url.scheme?.lowercased() == "claudeusagewidget" else { return nil }
+        let target = "retry"
+        let matchesHost = url.host?.lowercased() == target
+        // Accept both host and path forms for compatibility with already-shipped deep links.
+        let matchesPath = url.path.lowercased() == "/\(target)"
+        let matchesPathOnly = (url.host == nil || url.host?.isEmpty == true) && matchesPath
+        let matchesRetry = matchesHost || matchesPathOnly
+        return matchesRetry ? .retry : nil
+    }
 }
 
 // Timing knobs for the timeline policy. Surface them in one place so the

@@ -160,6 +160,137 @@ final class UsageServiceHTTPTests: XCTestCase {
     }
 }
 
+final class UsageProviderTests: XCTestCase {
+    private var keychain: KeychainStore!
+    private var cacheURL: URL!
+    private var sessions: [URLSession] = []
+
+    override func setUp() {
+        super.setUp()
+        keychain = KeychainStore(service: "io.github.sergei-matheson.claudeusagewidget.provider-tests.\(UUID().uuidString)")
+        cacheURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("usage_provider_\(UUID().uuidString).json")
+    }
+
+    override func tearDown() {
+        sessions.forEach { $0.invalidateAndCancel() }
+        sessions.removeAll()
+        try? keychain.delete()
+        try? FileManager.default.removeItem(at: cacheURL)
+        StubURLProtocol.handler = nil
+        StubURLProtocol.error = nil
+        super.tearDown()
+    }
+
+    private func makeProvider() -> UsageProvider {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [StubURLProtocol.self]
+        let session = URLSession(configuration: config)
+        sessions.append(session)
+        let service = UsageService(session: session)
+        let cache = UsageCache(cacheURL: cacheURL)
+        return UsageProvider(service: service, keychain: keychain, cache: cache)
+    }
+
+    private func awaitTimeline(_ provider: UsageProvider) async -> Timeline<UsageEntry> {
+        await withCheckedContinuation { continuation in
+            provider.getTimeline(in: .init()) { timeline in
+                continuation.resume(returning: timeline)
+            }
+        }
+    }
+
+    func testUnauthenticatedWhenCredentialsMissing() async {
+        let timeline = await awaitTimeline(makeProvider())
+        XCTAssertEqual(timeline.entries.first?.state, .unauthenticated)
+    }
+
+    func testSuccessReturnsLoadedEntry() async throws {
+        try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: ""))
+        StubURLProtocol.handler = { request in
+            let body = Data(
+                #"{"five_hour":{"utilization":12.0,"resets_at":null},"seven_day":{"utilization":7.0,"resets_at":null}}"#.utf8
+            )
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, body)
+        }
+
+        let timeline = await awaitTimeline(makeProvider())
+        XCTAssertEqual(timeline.entries.first?.state, .loaded)
+        XCTAssertEqual(timeline.entries.first?.usageData?.fiveHourUtilization, 12)
+        XCTAssertEqual(timeline.entries.first?.usageData?.sevenDayUtilization, 7)
+    }
+
+    func testRateLimitedWithRetryAfterSchedulesRetry() async throws {
+        try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: ""))
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 429,
+                    httpVersion: nil,
+                    headerFields: ["Retry-After": "120"]
+                )!,
+                Data()
+            )
+        }
+
+        let timeline = await awaitTimeline(makeProvider())
+        XCTAssertEqual(timeline.entries.first?.state, .error("Rate limited. Retrying soon."))
+        if case .after(let date) = timeline.policy {
+            XCTAssertGreaterThanOrEqual(date.timeIntervalSinceNow, 100)
+            XCTAssertLessThanOrEqual(date.timeIntervalSinceNow, 140)
+        } else {
+            XCTFail("expected .after policy")
+        }
+    }
+
+    func testRateLimitedWithoutRetryAfterUsesFallbackAndCache() async throws {
+        // Use a wider window to absorb CI scheduler/network jitter around async timeline generation.
+        let toleranceSeconds = 20.0
+        try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: ""))
+        try UsageCache(cacheURL: cacheURL).save(
+            UsageData(
+                fiveHourUtilization: 77,
+                periodResetDate: nil,
+                sevenDayUtilization: 22,
+                sevenDayResetDate: nil,
+                lastUpdated: Date()
+            )
+        )
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 429, httpVersion: nil, headerFields: nil)!, Data())
+        }
+
+        let timeline = await awaitTimeline(makeProvider())
+        XCTAssertEqual(timeline.entries.first?.state, .loaded)
+        XCTAssertEqual(timeline.entries.first?.usageData?.fiveHourUtilization, 77)
+        if case .after(let date) = timeline.policy {
+            XCTAssertGreaterThanOrEqual(date.timeIntervalSinceNow, RefreshPolicy.rateLimitedFallback - toleranceSeconds)
+            XCTAssertLessThanOrEqual(date.timeIntervalSinceNow, RefreshPolicy.rateLimitedFallback + toleranceSeconds)
+        } else {
+            XCTFail("expected .after policy")
+        }
+    }
+
+    func testNetworkErrorFallsBackToCache() async throws {
+        try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: ""))
+        try UsageCache(cacheURL: cacheURL).save(
+            UsageData(
+                fiveHourUtilization: 45,
+                periodResetDate: nil,
+                sevenDayUtilization: 10,
+                sevenDayResetDate: nil,
+                lastUpdated: Date()
+            )
+        )
+        StubURLProtocol.error = URLError(.timedOut)
+
+        let timeline = await awaitTimeline(makeProvider())
+        XCTAssertEqual(timeline.entries.first?.state, .loaded)
+        XCTAssertEqual(timeline.entries.first?.usageData?.fiveHourUtilization, 45)
+    }
+}
+
 // MARK: - URLProtocol stub
 
 private final class StubURLProtocol: URLProtocol {
