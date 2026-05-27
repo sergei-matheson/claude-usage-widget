@@ -3,6 +3,7 @@ import Foundation
 enum UsageServiceError: Error {
     case unauthenticated
     case invalidOrganizationId
+    case rateLimited(retryAfter: TimeInterval?)
     case networkError(Error)
     case decodingError(Error)
     case unexpectedResponse(Int)
@@ -50,14 +51,19 @@ struct UsageService {
         case 401, 403:
             throw UsageServiceError.unauthenticated
         case 429:
-            throw UsageServiceError.unexpectedResponse(429)
+            throw UsageServiceError.rateLimited(retryAfter: Self.parseRetryAfter(http))
         default:
             throw UsageServiceError.unexpectedResponse(http.statusCode)
         }
 
+        return try Self.parse(data: data)
+    }
+
+    // Decode a Claude usage payload into UsageData. Exposed for tests; not part of the public API
+    // that views or providers should call.
+    static func parse(data: Data) throws -> UsageData {
         do {
-            let apiResponse = try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: data)
-            return apiResponse.toUsageData()
+            return try JSONDecoder.usageDecoder.decode(UsageAPIResponse.self, from: data).toUsageData()
         } catch {
             throw UsageServiceError.decodingError(error)
         }
@@ -66,6 +72,15 @@ struct UsageService {
     // Claude org IDs are UUIDs. Anything else is rejected so a hostile org-ID value
     // can't pivot the authenticated request to another claude.ai path.
     static let organizationIdPattern = #/^[A-Za-z0-9-]{1,64}$/#
+
+    // Retry-After is either a delay in seconds or an HTTP-date. We honor the seconds form;
+    // an HTTP-date is rare from claude.ai and falls back to the policy default.
+    static func parseRetryAfter(_ response: HTTPURLResponse) -> TimeInterval? {
+        guard let header = response.value(forHTTPHeaderField: "Retry-After"),
+              let seconds = TimeInterval(header.trimmingCharacters(in: .whitespaces)),
+              seconds > 0 else { return nil }
+        return seconds
+    }
 
     func buildURL(credentials: SessionCredentials) -> URL? {
         if credentials.organizationId.isEmpty {
@@ -82,12 +97,12 @@ struct UsageService {
     }
 }
 
-struct UsageBucket: Codable {
+private struct UsageBucket: Codable {
     let utilization: Double?
     let resetsAt: String?
 }
 
-struct UsageAPIResponse: Codable {
+private struct UsageAPIResponse: Codable {
     let fiveHour: UsageBucket?
     let sevenDay: UsageBucket?
 
