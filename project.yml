@@ -68,6 +68,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.sergei-matheson.claudeusagewidget.tests
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
 
   ClaudeUsageWidgetExtension:
     type: app-extension
