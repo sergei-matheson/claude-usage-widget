@@ -40,6 +40,12 @@ class UsageProvider {
     +placeholder(Context) UsageEntry
     +getSnapshot(Context, completion)
     +getTimeline(Context, completion)
+    +buildResult() async Result
+}
+
+class `UsageProvider.Result` {
+    +entries: [UsageEntry]
+    +refreshDate: Date?
 }
 
 class UsageService {
@@ -56,6 +62,7 @@ UsageEntry --> UsageData : holds
 UsageEntry --> EntryState : describes state
 UsageProvider --> UsageService : calls
 UsageProvider --> KeychainStore : reads credentials from
+UsageProvider --> `UsageProvider.Result` : produces
 UsageService --> UsageData : produces
 KeychainStore --> SessionCredentials : manages
 ```
@@ -123,7 +130,7 @@ KeychainStore --> SessionCredentials : manages
 2. Targets:
    - `ClaudeUsageWidgetApp` — macOS SwiftUI host app (macOS 26.0+)
    - `ClaudeUsageWidgetExtension` — WidgetKit App Extension
-   - `ClaudeUsageWidgetTests` — unit test bundle; sources include `ClaudeUsageWidgetTests/` and `ClaudeUsageWidget/Shared/`; depends on `WidgetKit.framework`
+   - `ClaudeUsageWidgetTests` — unit test bundle; sources include `ClaudeUsageWidgetTests/`, `ClaudeUsageWidget/Shared/`, and `ClaudeUsageWidget/Widget/Provider/`; depends on `WidgetKit.framework`; build settings: `CODE_SIGN_IDENTITY=""`, `CODE_SIGNING_REQUIRED=NO`, `CODE_SIGNING_ALLOWED=NO` (required for CI environments without signing certificates)
 3. Entitlements for app and extension targets:
    - App Groups: `group.com.yourorg.claudeusagewidget`
    - Keychain Sharing: `com.yourorg.claudeusagewidget`
@@ -214,21 +221,25 @@ KeychainStore --> SessionCredentials : manages
 ### Create — UsageProvider (TimelineProvider)
 1. Responsibility: Supply WidgetKit with `UsageEntry` instances on a 30-minute refresh schedule
 2. Dependencies: `UsageService`, `KeychainStore`, `UsageCache`
-3. Methods:
+3. Nested type `Result`:
+   - `entries: [UsageEntry]` — entries for the timeline
+   - `refreshDate: Date?` — when to schedule the next reload; `nil` maps to `.never` policy (`TimelineReloadPolicy` is a struct with no accessible stored properties and cannot be pattern-matched, so the date is carried separately)
+4. Methods:
    - `func placeholder(in context: Context) -> UsageEntry`
      - Return: `UsageEntry` built from `UsageData.placeholder()`
    - `func getSnapshot(in context: Context, completion: @escaping (UsageEntry) -> Void)`
      - Logic: return `UsageCache.load()` if available, otherwise placeholder
    - `func getTimeline(in context: Context, completion: @escaping (Timeline<UsageEntry>) -> Void)`
+     - Logic: call `await buildResult()`; convert `Result.refreshDate` to `TimelineReloadPolicy` (`.after(date)` when non-nil, `.never` when nil); call `completion(Timeline(entries:policy:))`
+   - `func buildResult() async -> Result`
      - Logic:
-       1. Load credentials from `KeychainStore`; if `.notFound` → completion with single `.unauthenticated` entry, policy `.never`
+       1. Load credentials from `KeychainStore`; if `.notFound` → return `Result(entries: [.unauthenticated()], refreshDate: nil)`
        2. `await UsageService.fetchUsage(credentials:)`; on success: save to `UsageCache`, create `.loaded` entry
-       3. If `usage.periodResetDate < Date()` set policy to `.after(Date().addingTimeInterval(300))` (5-min fast-path to pick up post-reset data); otherwise default to 30-min interval
-       4. On `UsageServiceError.unauthenticated`: return `.unauthenticated` entry, policy `.never`
-       5. On `UsageServiceError.unexpectedResponse(429)`: use 60-min back-off; return cached entry if available, else `.error`
-       6. On other error: load stale `UsageCache`; if available return `.loaded` entry (staleness visible via `lastUpdated`); else return `.error` entry
-       7. Default `nextRefresh = Date().addingTimeInterval(1800)` (30 minutes)
-       8. Call `completion(Timeline(entries: [entry], policy: .after(nextRefresh)))`
+       3. If `usage.periodResetDate < Date()` set `refreshDate` to `Date().addingTimeInterval(RefreshPolicy.postResetInterval)` (5-min fast-path); otherwise use `RefreshPolicy.refreshInterval` (30 min)
+       4. On `UsageServiceError.unauthenticated`: return `Result(entries: [.unauthenticated()], refreshDate: nil)`
+       5. On `UsageServiceError.rateLimited(retryAfter)`: use `retryAfter ?? RefreshPolicy.rateLimitedFallback` as delay; return cached entry if available, else `.error("Rate limited. Retrying soon.")`; `refreshDate` is the computed retry date
+       6. On other error: load stale `UsageCache`; if available return `.loaded` entry with `refreshDate = nextRefresh`; else return `.error("Couldn't reach claude.ai")` with `refreshDate = nextRefresh`
+     - Note: `TimelineProviderContext` has no public initializer and cannot be constructed in tests; all timeline logic lives in `buildResult()` which takes no WidgetKit protocol arguments and is directly callable from unit tests
 
 ### Create SwiftUI Widget Views
 1. `WidgetEntryView` — root view with two-level dispatch
@@ -266,6 +277,36 @@ KeychainStore --> SessionCredentials : manages
    - Icon: SF Symbol `exclamationmark.triangle`
    - Deep-link label: "Tap to retry" — links to host app via custom URL scheme
 
+### Create Install Script (`install.sh`)
+1. Responsibility: Automate building and installing the app locally for end users
+2. Prerequisites check: verify `xcodegen` is on `$PATH` (error with install hint if missing); verify Xcode CLI tools via `xcode-select -p`
+3. Steps:
+   1. Run `xcodegen generate --quiet`
+   2. Run `xcodebuild build` into a temp directory (cleaned up via `trap`); scheme `ClaudeUsageWidgetApp`, configuration Debug
+   3. Find the built `.app` bundle under the derived data temp dir
+   4. Copy to `/Applications/`, removing any prior installation
+   5. Clear quarantine: `xattr -dr com.apple.quarantine /Applications/ClaudeUsageWidgetApp.app`
+   6. Register widget extension: `pluginkit -e use -i io.github.sergei-matheson.claudeusagewidget.extension`
+4. Executable: `chmod +x install.sh`; run from repo root with `./install.sh`
+
+### Create Test Script (`test.sh`)
+1. Responsibility: Convenience wrapper around `xcodegen generate` + `xcodebuild test` for local and CI use
+2. Steps:
+   1. Run `xcodegen generate --quiet`
+   2. Run `xcodebuild test -project ClaudeUsageWidget.xcodeproj -scheme ClaudeUsageWidgetTests -destination 'platform=macOS'`; pipe output through `xcbeautify` for readable formatting
+3. Optional argument: if `$1` is provided, pass as `-only-testing:"$1"` to run a single test class or method (e.g. `./test.sh ClaudeUsageWidgetTests/UsageServiceTests/testParsesUtilizationValues`)
+4. Executable: `chmod +x test.sh`; run from repo root with `./test.sh`
+
+### Create CI Pipeline (`.github/workflows/ci.yml`)
+1. Responsibility: Run the test suite automatically on every push to `main` and on every pull request
+2. Triggers: `push` to `main`; `pull_request` (all branches)
+3. Runner: `macos-26` (matches deployment target)
+4. Steps:
+   1. `actions/checkout@v6`
+   2. Install `xcodegen` and `xcbeautify` via Homebrew
+   3. Run `./test.sh`
+5. The test target's code signing is disabled in `project.yml` so no signing certificate is required on the runner
+
 ### Create ClaudeUsageWidget (Widget Entry Point)
 1. Responsibility: Widget bundle declaration
 2. Declare `@main struct ClaudeUsageWidget: Widget` with `kind = "ClaudeUsageWidget"`, `StaticConfiguration` using `UsageProvider`, `WidgetEntryView`, display name "Claude Usage", and `supportedFamilies([.systemSmall, .systemMedium])`
@@ -288,10 +329,10 @@ KeychainStore --> SessionCredentials : manages
 4. Supplementary text explaining how to obtain the session token from browser DevTools
 
 ### Create Unit Tests
-1. Responsibility: Verify JSON parsing and data mapping in `UsageService`
-2. Target: `ClaudeUsageWidgetTests` — unit test bundle that compiles `ClaudeUsageWidget/Shared/` source files directly (no `@testable import`; shared types are accessible within the same compilation unit)
+1. Responsibility: Verify JSON parsing, HTTP behaviour, and timeline logic
+2. Target: `ClaudeUsageWidgetTests` — unit test bundle that compiles `ClaudeUsageWidget/Shared/`, `ClaudeUsageWidget/Widget/Provider/` source files directly (no `@testable import`; shared types are accessible within the same compilation unit); imports `WidgetKit` for `UsageProvider.Result` and `UsageEntry`
 3. Test class: `UsageServiceTests: XCTestCase`
-4. Test cases:
+4. Test cases for `UsageServiceTests`:
    - `testParsesUtilizationValues` — decode full response JSON matching the real API shape; assert `messagesUsed == 15`, `messagesLimit == 100`, `sevenDayUtilization == 2`
    - `testRoundsUtilizationToNearestInt` — decode JSON with fractional utilization values (e.g. 15.6, 2.4); assert correct rounding
    - `testParsesFractionalSecondsResetDate` — verify that `resets_at` strings with fractional seconds (e.g. `"2026-05-25T10:00:01.174634+00:00"`) produce the correct `periodResetDate` rather than falling back to the default
@@ -299,6 +340,26 @@ KeychainStore --> SessionCredentials : manages
    - `testFallsBackWhenResetDateIsNull` — decode JSON where `resets_at` is null in both buckets; assert both reset dates fall back to appropriate defaults
    - `testIgnoresUnknownTopLevelKeys` — decode JSON containing unknown keys (`tangelo`, `iguana_necktie`); assert no decode error is thrown
    - `testPlanNameIsPro` — assert `planName == "Pro"` regardless of response content
+5. Test class: `UsageServiceHTTPTests: XCTestCase` — uses `StubURLProtocol` to intercept `URLSession` requests; verifies HTTP-level behaviour of `UsageService`
+6. Test cases for `UsageServiceHTTPTests`:
+   - `testReturnsUsageOn200` — stub 200 with valid JSON; assert decoded utilization
+   - `testThrowsUnauthenticatedOn401` / `testThrowsUnauthenticatedOn403` — assert `UsageServiceError.unauthenticated`
+   - `testThrowsRateLimitedOn429` — assert `UsageServiceError.rateLimited(nil)` when no `Retry-After` header
+   - `testHonorsRetryAfterHeaderOn429` — assert `retryAfter == 120` when `Retry-After: 120`
+   - `testIgnoresInvalidRetryAfterHeader` — assert `retryAfter == nil` for HTTP-date form of `Retry-After`
+   - `testThrowsUnexpectedOn500` — assert `UsageServiceError.unexpectedResponse(500)`
+   - `testThrowsDecodingErrorOnMalformedBody` — stub valid 200 with non-JSON body; assert `UsageServiceError.decodingError`
+   - `testSendsCookieHeader` — assert `Cookie: sessionKey=<value>` header is present
+   - `testRejectsInvalidOrganizationId` — assert `UsageServiceError.invalidOrganizationId` for path-traversal org ID
+   - `testWrapsNetworkErrors` — stub `URLError(.timedOut)`; assert `UsageServiceError.networkError`
+   - `testSendsUserAgentHeader` — assert `User-Agent: ClaudeUsageWidget/1.0 macOS`
+7. Test class: `UsageProviderTests: XCTestCase` — tests `UsageProvider.buildResult()` end-to-end using a real `KeychainStore` (unique service name per test), real `UsageCache` (temp file), and `StubURLProtocol`; verifies `Result.entries` and `Result.refreshDate` directly (avoids `TimelineProviderContext` and `TimelineReloadPolicy` WidgetKit types)
+8. Test cases for `UsageProviderTests`:
+   - `testUnauthenticatedWhenCredentialsMissing` — no keychain entry; assert `entries.first?.state == .unauthenticated` and `refreshDate == nil`
+   - `testSuccessReturnsLoadedEntry` — valid credentials + 200 stub; assert `.loaded`, correct utilization values
+   - `testRateLimitedWithRetryAfterSchedulesRetry` — 429 with `Retry-After: 120`; assert `.error("Rate limited. Retrying soon.")` and `refreshDate ≈ now + 120s`
+   - `testRateLimitedWithoutRetryAfterUsesFallbackAndCache` — 429 no header + pre-seeded cache; assert `.loaded` stale data and `refreshDate ≈ now + RefreshPolicy.rateLimitedFallback`
+   - `testNetworkErrorFallsBackToCache` — `URLError(.timedOut)` + pre-seeded cache; assert `.loaded` cached data
 
 ## Norms
 1. Language & Frameworks: Swift 5.9+, SwiftUI, WidgetKit; macOS 26.0+ deployment target; zero third-party dependencies
@@ -314,6 +375,7 @@ KeychainStore --> SessionCredentials : manages
 11. JSON Coding: Use `JSONDecoder.usageDecoder` and `JSONEncoder.usageEncoder` (defined as static extensions in `UsageData.swift`) for all domain model serialisation; never instantiate standalone decoders/encoders inline for domain types
 12. Widget Background: All widget entry views must apply `.containerBackground(for: .widget) { Color.clear }` at the root body level; this is required by WidgetKit on macOS 14+ and must not be omitted
 13. Testability: Internal types that are logic-bearing and shared across the `ClaudeUsageWidget/Shared/` folder should be declared `internal` (not `private`) when they need to be accessed by the test target; `private` is acceptable only for file-local implementation details that carry no independent logic
+14. WidgetKit Testability: Extract all async timeline-building logic from `TimelineProvider` protocol methods into an internal method (e.g. `buildResult() async -> Result`) that takes no WidgetKit protocol arguments; `TimelineProviderContext` has no public initializer and cannot be constructed in tests; `TimelineReloadPolicy` is a struct with no accessible stored properties and cannot be pattern-matched — carry refresh dates as `Date?` in a plain result type instead
 
 ## Safeguards
 1. Functional Constraints:
@@ -351,4 +413,9 @@ KeychainStore --> SessionCredentials : manages
    - Shared Swift files added to both app and extension targets via "Target Membership" — no framework target required for MVP
    - Minimum Xcode version: 16.0 (for macOS 26 SDK with latest WidgetKit APIs)
    - Bundle ID of extension must be prefixed with the host app's bundle ID (e.g. `com.yourorg.claudeusagewidget.extension`)
-   - Test target (`ClaudeUsageWidgetTests`) compiles Shared sources directly; it must not be set as the extension's test host
+   - Test target (`ClaudeUsageWidgetTests`) compiles Shared sources and `Widget/Provider/` directly; it must not be set as the extension's test host
+   - Test target must set `CODE_SIGN_IDENTITY=""`, `CODE_SIGNING_REQUIRED=NO`, `CODE_SIGNING_ALLOWED=NO` so tests run in CI environments that have no signing certificate; unit test bundles do not require signing
+9. CI Constraints:
+   - The CI pipeline must run on a runner whose macOS version matches the deployment target (currently `macos-26`)
+   - `xcbeautify` must be installed alongside `xcodegen` on the CI runner; `test.sh` pipes `xcodebuild` output through it
+   - No secrets or signing credentials are required for the test pipeline; the code-signing build settings on the test target are sufficient
