@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A macOS menubar/Notification Center widget that polls the undocumented `claude.ai/api/usage` endpoint and displays the 5-hour rate-limit window and 7-day rolling usage. The app's only UI is a settings screen for entering the session token; everything else lives in the WidgetKit extension.
 
-Target macOS version: **26.0**. Swift 5.9.
+Target macOS version: **15.0**. Swift 5.9.
 
 ## Build & run
 
