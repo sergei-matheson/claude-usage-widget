@@ -11,4 +11,4 @@ xcodebuild test \
   -project ClaudeUsageWidget.xcodeproj \
   -scheme ClaudeUsageWidgetTests \
   -destination 'platform=macOS' \
-  ${1:+-only-testing:"$1"}
+  ${1:+-only-testing:"$1"} | xcbeautify
