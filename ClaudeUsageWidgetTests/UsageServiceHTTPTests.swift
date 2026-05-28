@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import WidgetKit
 
 final class UsageServiceHTTPTests: XCTestCase {
 
@@ -192,12 +193,8 @@ final class UsageProviderTests: XCTestCase {
         return UsageProvider(service: service, keychain: keychain, cache: cache)
     }
 
-    private func awaitTimeline(_ provider: UsageProvider) async -> Timeline<UsageEntry> {
-        await withCheckedContinuation { continuation in
-            provider.getTimeline(in: .init()) { timeline in
-                continuation.resume(returning: timeline)
-            }
-        }
+    private func awaitTimeline(_ provider: UsageProvider) async -> UsageProvider.Result {
+        await provider.buildResult()
     }
 
     func testUnauthenticatedWhenCredentialsMissing() async {
@@ -236,11 +233,11 @@ final class UsageProviderTests: XCTestCase {
 
         let timeline = await awaitTimeline(makeProvider())
         XCTAssertEqual(timeline.entries.first?.state, .error("Rate limited. Retrying soon."))
-        if case .after(let date) = timeline.policy {
+        if let date = timeline.refreshDate {
             XCTAssertGreaterThanOrEqual(date.timeIntervalSinceNow, 100)
             XCTAssertLessThanOrEqual(date.timeIntervalSinceNow, 140)
         } else {
-            XCTFail("expected .after policy")
+            XCTFail("expected a refresh date")
         }
     }
 
@@ -264,11 +261,11 @@ final class UsageProviderTests: XCTestCase {
         let timeline = await awaitTimeline(makeProvider())
         XCTAssertEqual(timeline.entries.first?.state, .loaded)
         XCTAssertEqual(timeline.entries.first?.usageData?.fiveHourUtilization, 77)
-        if case .after(let date) = timeline.policy {
+        if let date = timeline.refreshDate {
             XCTAssertGreaterThanOrEqual(date.timeIntervalSinceNow, RefreshPolicy.rateLimitedFallback - toleranceSeconds)
             XCTAssertLessThanOrEqual(date.timeIntervalSinceNow, RefreshPolicy.rateLimitedFallback + toleranceSeconds)
         } else {
-            XCTFail("expected .after policy")
+            XCTFail("expected a refresh date")
         }
     }
 

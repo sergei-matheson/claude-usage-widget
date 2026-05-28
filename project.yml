@@ -61,6 +61,7 @@ targets:
     sources:
       - ClaudeUsageWidgetTests
       - path: ClaudeUsageWidget/Shared
+      - path: ClaudeUsageWidget/Widget/Provider
     dependencies:
       - sdk: WidgetKit.framework
     settings:
