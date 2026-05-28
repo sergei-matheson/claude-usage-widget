@@ -45,6 +45,7 @@
 		D7BED98AEADC18BEA1584F45 /* MediumWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66EB34BFA023304AB6E2CBBA /* MediumWidgetView.swift */; };
 		D8686EE62CC570BCCEFE821C /* UsageServiceHTTPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA945102BEE06CE2237FEC6E /* UsageServiceHTTPTests.swift */; };
 		E1B155D0F22A795F7F294943 /* UnauthenticatedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C04451F3DFC0966F7436E7 /* UnauthenticatedView.swift */; };
+		EA8EC2B0231AC0B7B1930E86 /* UsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4EA14192990C3C95E3F661 /* UsageProvider.swift */; };
 		EBBB450900C759DC6CEC4548 /* EntryState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC0303452D99B6E4CE967B7 /* EntryState.swift */; };
 		ED33C00C1CF85074301BA63A /* SessionCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6ABE6F1C9AE1CA419DDE002 /* SessionCredentials.swift */; };
 		EF17D39C5D298ECFF847D4A5 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB22D10AA358CF4828F9A989 /* KeychainStore.swift */; };
@@ -382,6 +383,7 @@
 				6C3EF3D14D263FE07D562A63 /* UsageCacheTests.swift in Sources */,
 				44C78CB4E2CB90A6325724E9 /* UsageData.swift in Sources */,
 				7C4CC244862D05CAD02BF74B /* UsageEntry.swift in Sources */,
+				EA8EC2B0231AC0B7B1930E86 /* UsageProvider.swift in Sources */,
 				2684F715C028B4B2BEB64169 /* UsageService.swift in Sources */,
 				D8686EE62CC570BCCEFE821C /* UsageServiceHTTPTests.swift in Sources */,
 				A0AB1BD1919DAC20D0066CF8 /* UsageServiceTests.swift in Sources */,
