@@ -13,20 +13,13 @@ A macOS widget that shows your [Claude.ai](https://claude.ai) usage at a glance.
 
 ### 1. Build and install
 
-Open `ClaudeUsageWidget.xcodeproj` in Xcode and press **⌘B** to build, then copy the app to `/Applications`:
+Run the install script (requires Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen)):
 
-```
-cp -R ~/Library/Developer/Xcode/DerivedData/ClaudeUsageWidget-*/Build/Products/Debug/ClaudeUsageWidgetApp.app /Applications/
-```
-
-Then clear the quarantine flag and register the widget extension:
-
-```
-xattr -dr com.apple.quarantine /Applications/ClaudeUsageWidgetApp.app
-pluginkit -e use -i io.github.sergei-matheson.claudeusagewidget.extension
+```sh
+./install.sh
 ```
 
-Open the app from `/Applications`.
+This builds the app, copies it to `/Applications`, clears the quarantine flag, and registers the widget extension. Then open the app from `/Applications`.
 
 ### 2. Enter your session token
 
@@ -40,6 +33,21 @@ To find it:
 ### 3. Add the widget
 
 Open Notification Center, scroll to the bottom, click **Edit Widgets**, and search for **Claude Usage**.
+
+## Development
+
+Run the test suite:
+
+```sh
+./test.sh
+```
+
+To run a specific test class or method, pass its identifier:
+
+```sh
+./test.sh ClaudeUsageWidgetTests/UsageServiceTests
+./test.sh ClaudeUsageWidgetTests/UsageServiceTests/testParsesUtilizationValues
+```
 
 ## Notes
 
