@@ -68,23 +68,23 @@ MediumWidgetView --> RefreshUsageIntent : triggers
 ## Operations
 
 ### Update View - SmallWidgetView
-1. Responsibility: Render 5-hour usage arc with an optionally visible, more prominent refresh button in the bottom-trailing corner
+1. Responsibility: Render a full-width refresh button at the top of the widget, followed by the 5-hour usage arc and labels
 2. Attributes:
    - `usage`: `UsageData` — existing, unchanged
    - `showRefreshButton`: `Bool` — new parameter; insert after `usage`; default value `true`
 3. Methods:
    - `body`: `some View`
      - Logic:
-       - Keep the existing `ZStack(alignment: .bottomTrailing)` wrapping the `VStack` content
-       - Wrap the existing `Button(intent: RefreshUsageIntent()) { ... }` block in `if showRefreshButton { ... }`
-       - Inside the button label: change `.font(.system(size: 9))` to `.font(.system(size: 11))`
-       - Change `.foregroundStyle(.tertiary)` to `.foregroundStyle(.secondary)`
-       - Change `.padding(4)` on the button to `.padding(6)` for a slightly larger tap target
-       - All other subviews (`progressArc`, `usageText`, `resetLabel`, `staleLabel`) remain unchanged
+       - Replace the `ZStack(alignment: .bottomTrailing)` with a plain `VStack(spacing: 4)`
+       - As the first item in the VStack, conditionally render the button: `if showRefreshButton { ... }`
+       - Button label: `Label("Refresh", systemImage: "arrow.clockwise")` with `.font(.caption2)` and `.frame(maxWidth: .infinity)`
+       - Button style: `.buttonStyle(.bordered)`
+       - Below the button: `progressArc`, `usageText`, `resetLabel`, then `if isStale { staleLabel }` — all unchanged
+       - Move `.padding(10)` to the outer VStack (was on the inner VStack inside ZStack)
 4. Annotations: `struct SmallWidgetView: View` — no annotation changes
 5. Constraints:
    - `showRefreshButton` must default to `true`
-   - Do not alter the ZStack layout, VStack content, arc shape, or label subviews
+   - Do not alter the arc shape, label subviews, or their order below the button
 
 ### Update View - MediumWidgetView
 1. Responsibility: Render the two-column medium widget; embed `SmallWidgetView` without its own button to avoid duplication; show a single, more visible refresh button in the right-pane footer
