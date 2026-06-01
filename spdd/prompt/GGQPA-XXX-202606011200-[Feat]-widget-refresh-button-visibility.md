@@ -68,7 +68,7 @@ MediumWidgetView --> RefreshUsageIntent : triggers
 ## Operations
 
 ### Update View - SmallWidgetView
-1. Responsibility: Render a full-width refresh button at the top of the widget, followed by the 5-hour usage arc and labels
+1. Responsibility: Render the 5-hour usage arc and labels, followed by a full-width refresh button at the bottom
 2. Attributes:
    - `usage`: `UsageData` — existing, unchanged
    - `showRefreshButton`: `Bool` — new parameter; insert after `usage`; default value `true`
@@ -76,15 +76,14 @@ MediumWidgetView --> RefreshUsageIntent : triggers
    - `body`: `some View`
      - Logic:
        - Replace the `ZStack(alignment: .bottomTrailing)` with a plain `VStack(spacing: 4)`
-       - As the first item in the VStack, conditionally render the button: `if showRefreshButton { ... }`
+       - VStack order: `progressArc`, `usageText`, `resetLabel`, then `if isStale { staleLabel }`, then `if showRefreshButton { ... }`
        - Button label: `Label("Refresh", systemImage: "arrow.clockwise")` with `.font(.caption2)` and `.frame(maxWidth: .infinity)`
        - Button style: `.buttonStyle(.bordered)`
-       - Below the button: `progressArc`, `usageText`, `resetLabel`, then `if isStale { staleLabel }` — all unchanged
        - Move `.padding(10)` to the outer VStack (was on the inner VStack inside ZStack)
 4. Annotations: `struct SmallWidgetView: View` — no annotation changes
 5. Constraints:
    - `showRefreshButton` must default to `true`
-   - Do not alter the arc shape, label subviews, or their order below the button
+   - Button must be the last item in the VStack, after all data labels
 
 ### Update View - MediumWidgetView
 1. Responsibility: Render the two-column medium widget; embed `SmallWidgetView` without its own button to avoid duplication; show a single, more visible refresh button in the right-pane footer
