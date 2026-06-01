@@ -3,6 +3,7 @@ import AppIntents
 
 struct SmallWidgetView: View {
     let usage: UsageData
+    var showRefreshButton: Bool = true
 
     private var usageFraction: Double {
         min(Double(usage.fiveHourUtilization) / 100.0, 1.0)
@@ -37,13 +38,15 @@ struct SmallWidgetView: View {
             }
             .padding(10)
 
-            Button(intent: RefreshUsageIntent()) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
+            if showRefreshButton {
+                Button(intent: RefreshUsageIntent()) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(6)
             }
-            .buttonStyle(.plain)
-            .padding(4)
         }
     }
 

@@ -6,7 +6,7 @@ struct MediumWidgetView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            SmallWidgetView(usage: usage)
+            SmallWidgetView(usage: usage, showRefreshButton: false)
                 .frame(maxWidth: .infinity)
 
             Divider()
@@ -24,8 +24,8 @@ struct MediumWidgetView: View {
                     Spacer(minLength: 4)
                     Button(intent: RefreshUsageIntent()) {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
