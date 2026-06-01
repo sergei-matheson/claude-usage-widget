@@ -1,4 +1,5 @@
 import SwiftUI
+import AppIntents
 
 struct MediumWidgetView: View {
     let usage: UsageData
@@ -16,9 +17,18 @@ struct MediumWidgetView: View {
 
                 Spacer(minLength: 0)
 
-                Text("Updated \(usage.lastUpdated, style: .relative) ago")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("Updated \(usage.lastUpdated, style: .relative) ago")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    Button(intent: RefreshUsageIntent()) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 12)

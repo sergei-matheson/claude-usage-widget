@@ -7,8 +7,10 @@ struct SettingsView: View {
     @State private var statusMessage = ""
     @State private var hasSavedToken = false
     @State private var statusClearTask: Task<Void, Never>?
+    @State private var diagnosticsEntry: DiagnosticsEntry? = nil
 
     private let keychain = KeychainStore()
+    private let diagnosticsStore = DiagnosticsStore()
     private var isSaveDisabled: Bool { SessionCredentials.normalizeToken(sessionToken).isEmpty }
 
     var body: some View {
@@ -37,6 +39,35 @@ struct SettingsView: View {
 
                 Button("Clear", role: .destructive) { clearCredentials() }
                     .disabled(!hasSavedToken)
+
+                Button("Refresh Widget") {
+                    WidgetCenter.shared.reloadAllTimelines()
+                    diagnosticsEntry = diagnosticsStore.load()
+                }
+                .disabled(!hasSavedToken)
+            }
+
+            Section("Diagnostics") {
+                if let entry = diagnosticsEntry {
+                    LabeledContent("Last fetch") {
+                        Text(entry.fetchDate, format: .dateTime)
+                    }
+                    LabeledContent("Source") {
+                        Text(entry.source == .live ? "Live" : "Cached")
+                    }
+                    LabeledContent("Fetch count") {
+                        Text("\(entry.totalFetches)")
+                    }
+                    if let err = entry.errorMessage {
+                        Text(err)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                } else {
+                    Text("No fetch data yet")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
             }
 
             if !statusMessage.isEmpty {
@@ -56,6 +87,7 @@ struct SettingsView: View {
             organizationId = existing.organizationId
             hasSavedToken = !existing.sessionKey.isEmpty
         }
+        diagnosticsEntry = diagnosticsStore.load()
     }
 
     private func setStatus(_ message: String) {

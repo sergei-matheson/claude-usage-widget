@@ -6,6 +6,7 @@ import Security
 enum BundleIdentifiers {
     static let base = "io.github.sergei-matheson.claudeusagewidget"
     static let appGroup = "group.\(base)"
+    static let widgetKind = "ClaudeUsageWidget"
     // Derived from runtime signing entitlements to avoid hard-coding a Team ID.
     static let keychainAccessGroup: String? =
         Entitlements.keychainAccessGroups.first(where: { $0.hasSuffix(".\(base)") })

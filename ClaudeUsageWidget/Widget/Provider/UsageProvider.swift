@@ -1,19 +1,24 @@
 import WidgetKit
 import Foundation
+import OSLog
 
 struct UsageProvider: TimelineProvider {
     private let service: UsageService
     private let keychain: KeychainStore
     private let cache: UsageCache
+    private let diagnostics: DiagnosticsStore
+    private let logger = Logger(subsystem: BundleIdentifiers.base, category: "UsageProvider")
 
     init(
         service: UsageService = UsageService(),
         keychain: KeychainStore = KeychainStore(),
-        cache: UsageCache = UsageCache()
+        cache: UsageCache = UsageCache(),
+        diagnostics: DiagnosticsStore = DiagnosticsStore()
     ) {
         self.service = service
         self.keychain = keychain
         self.cache = cache
+        self.diagnostics = diagnostics
     }
 
     struct Result {
@@ -42,6 +47,9 @@ struct UsageProvider: TimelineProvider {
     }
 
     func buildResult() async -> Result {
+        let fetchCount = diagnostics.nextFetchCount()
+        logger.info("buildResult starting, fetch #\(fetchCount, privacy: .public)")
+
         let credentials: SessionCredentials
         do {
             credentials = try keychain.load()
@@ -64,21 +72,35 @@ struct UsageProvider: TimelineProvider {
                 refreshDate = nextRefresh
             }
 
+            try? diagnostics.save(DiagnosticsEntry(
+                fetchDate: Date(), source: .live, errorMessage: nil, totalFetches: fetchCount))
+            logger.info("Timeline scheduled in \(Int(refreshDate.timeIntervalSinceNow), privacy: .public)s")
             return Result(entries: [UsageEntry(date: Date(), usageData: usage, state: .loaded)], refreshDate: refreshDate)
+
         } catch UsageServiceError.unauthenticated {
             return Result(entries: [.unauthenticated()], refreshDate: nil)
+
         } catch UsageServiceError.rateLimited(let retryAfter) {
             let delay = retryAfter ?? RefreshPolicy.rateLimitedFallback
             let laterRefresh = Date().addingTimeInterval(delay)
             if let stale = cache.load() {
+                try? diagnostics.save(DiagnosticsEntry(
+                    fetchDate: Date(), source: .cached, errorMessage: "Rate limited. Retrying soon.", totalFetches: fetchCount))
                 return Result(entries: [UsageEntry(date: Date(), usageData: stale, state: .loaded)], refreshDate: laterRefresh)
             } else {
+                try? diagnostics.save(DiagnosticsEntry(
+                    fetchDate: Date(), source: .cached, errorMessage: "Rate limited. Retrying soon.", totalFetches: fetchCount))
                 return Result(entries: [.error("Rate limited. Retrying soon.")], refreshDate: laterRefresh)
             }
+
         } catch {
             if let stale = cache.load() {
+                try? diagnostics.save(DiagnosticsEntry(
+                    fetchDate: Date(), source: .cached, errorMessage: error.localizedDescription, totalFetches: fetchCount))
                 return Result(entries: [UsageEntry(date: Date(), usageData: stale, state: .loaded)], refreshDate: nextRefresh)
             } else {
+                try? diagnostics.save(DiagnosticsEntry(
+                    fetchDate: Date(), source: .cached, errorMessage: "Couldn't reach claude.ai", totalFetches: fetchCount))
                 return Result(entries: [.error("Couldn't reach claude.ai")], refreshDate: nextRefresh)
             }
         }

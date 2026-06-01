@@ -40,6 +40,7 @@ targets:
         embed: true
         codeSign: true
       - sdk: WidgetKit.framework
+      - sdk: AppIntents.framework
     entitlements:
       path: ClaudeUsageWidget/Resources/ClaudeUsageWidgetApp.entitlements
       properties:
@@ -64,6 +65,7 @@ targets:
       - path: ClaudeUsageWidget/Widget/Provider
     dependencies:
       - sdk: WidgetKit.framework
+      - sdk: AppIntents.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.sergei-matheson.claudeusagewidget.tests
@@ -86,6 +88,7 @@ targets:
       - ClaudeUsageWidget/Shared
     dependencies:
       - sdk: WidgetKit.framework
+      - sdk: AppIntents.framework
     entitlements:
       path: ClaudeUsageWidget/Resources/ClaudeUsageWidgetExtension.entitlements
       properties:
