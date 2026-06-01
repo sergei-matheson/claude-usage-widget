@@ -1,4 +1,5 @@
 import SwiftUI
+import AppIntents
 
 struct SmallWidgetView: View {
     let usage: UsageData
@@ -25,15 +26,25 @@ struct SmallWidgetView: View {
     }
 
     var body: some View {
-        VStack(spacing: 4) {
-            progressArc
-            usageText
-            resetLabel
-            if isStale {
-                staleLabel
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 4) {
+                progressArc
+                usageText
+                resetLabel
+                if isStale {
+                    staleLabel
+                }
             }
+            .padding(10)
+
+            Button(intent: RefreshUsageIntent()) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .padding(4)
         }
-        .padding(10)
     }
 
     private var progressArc: some View {

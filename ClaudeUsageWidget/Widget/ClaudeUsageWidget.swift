@@ -3,7 +3,7 @@ import SwiftUI
 
 @main
 struct ClaudeUsageWidget: Widget {
-    let kind = "ClaudeUsageWidget"
+    let kind = BundleIdentifiers.widgetKind
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: UsageProvider()) { entry in

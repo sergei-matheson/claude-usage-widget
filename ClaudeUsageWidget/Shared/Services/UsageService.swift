@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 enum UsageServiceError: Error {
     case unauthenticated
@@ -13,6 +14,7 @@ struct UsageService {
     // The claude.ai usage endpoint is undocumented. Verify the exact path by inspecting
     // network traffic on https://claude.ai/settings/usage before shipping.
     private let session: URLSession
+    private let logger = Logger(subsystem: BundleIdentifiers.base, category: "UsageService")
 
     init(session: URLSession = UsageService.defaultSession) {
         self.session = session
@@ -34,6 +36,8 @@ struct UsageService {
         guard let url = buildURL(credentials: credentials) else {
             throw UsageServiceError.invalidOrganizationId
         }
+        logger.debug("Fetching usage from \(url.absoluteString, privacy: .public)")
+
         var request = URLRequest(url: url)
         request.setValue("sessionKey=\(credentials.sessionKey)", forHTTPHeaderField: "Cookie")
         request.setValue("ClaudeUsageWidget/1.0 macOS", forHTTPHeaderField: "User-Agent")
@@ -43,6 +47,7 @@ struct UsageService {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            logger.error("Network error: \(error.localizedDescription, privacy: .public)")
             throw UsageServiceError.networkError(error)
         }
 
@@ -52,16 +57,25 @@ struct UsageService {
 
         switch http.statusCode {
         case 200:
-            break
+            logger.info("Fetch succeeded")
         case 401, 403:
+            logger.warning("Unauthenticated — session token may be expired")
             throw UsageServiceError.unauthenticated
         case 429:
-            throw UsageServiceError.rateLimited(retryAfter: Self.parseRetryAfter(http))
+            let retryAfter = Self.parseRetryAfter(http)
+            logger.warning("Rate limited; retry-after=\(retryAfter ?? -1, privacy: .public)")
+            throw UsageServiceError.rateLimited(retryAfter: retryAfter)
         default:
+            logger.error("Unexpected HTTP \(http.statusCode, privacy: .public)")
             throw UsageServiceError.unexpectedResponse(http.statusCode)
         }
 
-        return try Self.parse(data: data)
+        do {
+            return try Self.parse(data: data)
+        } catch {
+            logger.error("Decoding failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
     }
 
     // Decode a Claude usage payload into UsageData. Exposed for tests; not part of the public API
