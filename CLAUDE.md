@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-A macOS Notification Center widget that polls the undocumented `claude.ai/api/usage` endpoint and displays the 5-hour rate-limit window and 7-day rolling usage. The app's only UI is a settings screen for entering the session token; everything else lives in the WidgetKit extension.
+A macOS Notification Center widget that polls the undocumented `claude.ai/api/organizations/{org_id}/usage` endpoint and displays the 5-hour rate-limit window and 7-day rolling usage. The app's only UI is a settings screen for entering the session token and org ID; everything else lives in the WidgetKit extension.
 
 Target macOS version: **26.0**. Swift 5.9.
 
@@ -50,7 +50,7 @@ Three targets share source via the `Shared/` directory:
 - **`Models/UsageData`** — the decoded API payload; also holds `JSONDecoder.usageDecoder` / `JSONEncoder.usageEncoder` helpers (snake_case ↔ camelCase, ISO 8601 dates).
 - **`Models/UsageEntry`** — conforms to `TimelineEntry`; wraps `UsageData?` + `EntryState` (`.loaded`, `.unauthenticated`, `.error`).
 - **`Services/KeychainStore`** — reads/writes `SessionCredentials` as JSON in the Keychain. Uses a shared access group derived at runtime from entitlements so both app and extension can access it. Tests pass a unique service name and no access group to avoid sandbox conflicts.
-- **`Services/UsageService`** — fetches `https://claude.ai/api/usage` (or the org-scoped variant). Maps the undocumented `five_hour` / `seven_day` JSON buckets to `UsageData`. The endpoint path should be verified by inspecting network traffic on `claude.ai/settings/usage` if it stops working.
+- **`Services/UsageService`** — fetches `https://claude.ai/api/organizations/{org_id}/usage`. An org ID is required; the personal `/api/usage` endpoint was removed in June 2026. Maps the undocumented `five_hour` / `seven_day` JSON buckets to `UsageData`. Verify the path by inspecting network traffic on `claude.ai/settings/usage` if it stops working.
 - **`Services/UsageCache`** — persists the last `UsageData` as JSON in the App Group container (`group.io.github.sergei-matheson.claudeusagewidget`). Cache expires after 24 hours.
 
 ### Widget extension (`ClaudeUsageWidget/Widget/`)

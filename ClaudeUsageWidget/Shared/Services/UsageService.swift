@@ -3,6 +3,7 @@ import OSLog
 
 enum UsageServiceError: Error {
     case unauthenticated
+    case notFound
     case invalidOrganizationId
     case rateLimited(retryAfter: TimeInterval?)
     case networkError(Error)
@@ -61,6 +62,9 @@ struct UsageService {
         case 401, 403:
             logger.warning("Unauthenticated — session token may be expired")
             throw UsageServiceError.unauthenticated
+        case 404:
+            logger.error("Endpoint not found (404) — org ID may be missing or incorrect")
+            throw UsageServiceError.notFound
         case 429:
             let retryAfter = Self.parseRetryAfter(http)
             logger.warning("Rate limited; retry-after=\(retryAfter ?? -1, privacy: .public)")

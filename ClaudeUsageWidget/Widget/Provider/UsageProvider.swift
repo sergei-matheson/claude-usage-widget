@@ -80,6 +80,14 @@ struct UsageProvider: TimelineProvider {
         } catch UsageServiceError.unauthenticated {
             return Result(entries: [.unauthenticated()], refreshDate: nil)
 
+        } catch UsageServiceError.notFound {
+            let message = credentials.organizationId.isEmpty
+                ? "Organization ID required — add it in settings"
+                : "Organization not found — check your org ID in settings"
+            try? diagnostics.save(DiagnosticsEntry(
+                fetchDate: Date(), source: .cached, errorMessage: message, totalFetches: fetchCount))
+            return Result(entries: [.error(message)], refreshDate: nil)
+
         } catch UsageServiceError.rateLimited(let retryAfter) {
             let delay = retryAfter ?? RefreshPolicy.rateLimitedFallback
             let laterRefresh = Date().addingTimeInterval(delay)
