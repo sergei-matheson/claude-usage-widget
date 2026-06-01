@@ -51,5 +51,8 @@ xattr -dr com.apple.quarantine "${INSTALL_DIR}/${APP_BUNDLE}"
 echo "==> Registering widget extension..."
 pluginkit -e use -i "$BUNDLE_ID"
 
+echo "==> Launching app to trigger extension discovery..."
+open "${INSTALL_DIR}/${APP_BUNDLE}"
+
 echo ""
-echo "Done. Open ${INSTALL_DIR}/${APP_BUNDLE} to enter your session token."
+echo "Done. Enter your session token in the app that just opened."
