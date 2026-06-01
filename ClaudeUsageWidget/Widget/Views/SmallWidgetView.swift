@@ -28,6 +28,12 @@ struct SmallWidgetView: View {
 
     var body: some View {
         VStack(spacing: 4) {
+            progressArc
+            usageText
+            resetLabel
+            if isStale {
+                staleLabel
+            }
             if showRefreshButton {
                 Button(intent: RefreshUsageIntent()) {
                     Label("Refresh", systemImage: "arrow.clockwise")
@@ -35,12 +41,6 @@ struct SmallWidgetView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-            }
-            progressArc
-            usageText
-            resetLabel
-            if isStale {
-                staleLabel
             }
         }
         .padding(10)
