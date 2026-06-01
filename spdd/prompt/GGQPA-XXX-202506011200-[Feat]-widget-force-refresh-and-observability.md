@@ -72,7 +72,13 @@ DiagnosticsEntry --> DiagnosticsStore : persisted by
    - Log fetch attempts, HTTP status codes, cache hits/misses, timeline scheduling decisions, and errors — visible in Console.app filtered by subsystem
    - No UI changes required for logging; it is purely operational
 
-3. Diagnostics Store (lightweight fetch metadata):
+3. Endpoint Not Found (404) handling:
+   - `UsageServiceError.notFound` is a distinct error case for HTTP 404 — separate from the generic `unexpectedResponse` bucket
+   - The personal `/api/usage` endpoint was removed in June 2026; an org ID is now required. A 404 should surface an actionable message rather than a generic network error
+   - `UsageProvider` catches `.notFound` and selects one of two messages based on whether the stored org ID is empty: "Organization ID required — add it in settings" or "Organization not found — check your org ID in settings"
+   - The retry policy for `.notFound` is `.never` — the user must take action before retrying makes sense
+
+4. Diagnostics Store (lightweight fetch metadata):
    - `DiagnosticsStore` follows the same App Group container pattern as `UsageCache`; it stores the latest `DiagnosticsEntry` as JSON at `diagnostics.json`
    - `UsageProvider.buildResult()` writes a `DiagnosticsEntry` at the end of every fetch — recording date, whether data came from live API or cache, and any error message
    - `SettingsView` reads `DiagnosticsStore` on appear and shows a read-only diagnostics section below the credential form
@@ -165,19 +171,21 @@ File: `ClaudeUsageWidget/Shared/Services/DiagnosticsStore.swift`
 5. Test seam: `init(storeURL: URL)` for tests
 6. Target membership: `ClaudeUsageWidgetApp` + `ClaudeUsageWidgetExtension`
 
-### Update Service — `UsageService` (add logging)
+### Update Service — `UsageService` (add logging and notFound error)
 File: `ClaudeUsageWidget/Shared/Services/UsageService.swift`
 
-1. Add `import OSLog` at the top
-2. Add private logger: `private let logger = Logger(subsystem: BundleIdentifiers.base, category: "UsageService")`
-3. Logging points in `fetchUsage(credentials:)`:
-   - Before request: `logger.debug("Fetching usage from \(url.absoluteString, privacy: .public)")`
-   - On HTTP 200: `logger.info("Fetch succeeded")`
-   - On 401/403: `logger.warning("Unauthenticated — session token may be expired")`
-   - On 429: `logger.warning("Rate limited; retry-after=\(delay)")`
-   - On network error: `logger.error("Network error: \(error.localizedDescription, privacy: .public)")`
-   - On other status: `logger.error("Unexpected HTTP \(http.statusCode)")`
-   - On decoding error: `logger.error("Decoding failed: \(error.localizedDescription, privacy: .public)")`
+1. Add `case notFound` to `UsageServiceError` (before `invalidOrganizationId`)
+2. Add `import OSLog` at the top
+3. Add private logger: `private let logger = Logger(subsystem: BundleIdentifiers.base, category: "UsageService")`
+4. Logging points and error cases in `fetchUsage(credentials:)`:
+   - Before request: log debug with URL (public privacy)
+   - On HTTP 200: log info "Fetch succeeded"
+   - On 401/403: log warning "Unauthenticated — session token may be expired", throw `.unauthenticated`
+   - On 404: log error "Endpoint not found (404) — org ID may be missing or incorrect", throw `.notFound`
+   - On 429: capture retry-after, log warning with delay value (public privacy), throw `.rateLimited`
+   - On other status: log error with status code (public privacy), throw `.unexpectedResponse`
+   - On network error: log error with localizedDescription (public privacy), throw `.networkError`
+   - On decoding error: log error with localizedDescription (public privacy), re-throw
 
 ### Update Service — `UsageCache` (add logging)
 File: `ClaudeUsageWidget/Shared/Services/UsageCache.swift`
@@ -218,6 +226,7 @@ File: `ClaudeUsageWidget/Widget/Provider/UsageProvider.swift`
          fetchDate: Date(), source: .cached, errorMessage: message, totalFetches: fetchCount))
      ```
    - Unauthenticated: no diagnostics write (not a fetch failure, a configuration state)
+   - Not found (`.notFound`) path: select message based on `credentials.organizationId.isEmpty` — "Organization ID required — add it in settings" if empty, "Organization not found — check your org ID in settings" if set; write diagnostics with that message and `source: .cached`; return `refreshDate: nil` (`.never` policy — no point retrying until the user acts)
 
 ### Update View — `SmallWidgetView` (refresh button)
 File: `ClaudeUsageWidget/Widget/Views/SmallWidgetView.swift`
@@ -316,3 +325,5 @@ File: `ClaudeUsageWidget/App/SettingsView.swift`
 7. Widget button layout must not overlap the primary usage data; use `ZStack(alignment: .bottomTrailing)` with minimal padding so the button is tucked into the corner
 8. `nextFetchCount()` reads-then-increments in the same call; it is not thread-safe across concurrent invocations, but `buildResult()` is always called serially from a single `Task` — this is acceptable
 9. Existing `UsageProvider` tests that call `buildResult()` directly must still compile after adding the `DiagnosticsStore` parameter — the default `DiagnosticsStore()` initializer covers this; tests that write to the App Group container in CI are already avoided by the `KeychainStore` test-seam pattern; extend the same pattern to `DiagnosticsStore` in `UsageProviderTests` by passing a temp-directory `DiagnosticsStore(storeURL:)`
+10. HTTP 404 must never fall through to the generic `unexpectedResponse` catch — it must be caught as `notFound` and handled with a user-actionable message; the retry policy must be `.never` so the widget does not hammer a known-dead endpoint
+11. The `notFound` message must not expose internal URL structure; it must guide the user toward the settings screen, not describe the failing HTTP path

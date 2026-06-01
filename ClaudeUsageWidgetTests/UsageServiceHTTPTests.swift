@@ -95,6 +95,17 @@ final class UsageServiceHTTPTests: XCTestCase {
         }
     }
 
+    func testThrowsNotFoundOn404() async {
+        StubURLProtocol.handler = { _ in
+            (HTTPURLResponse(url: URL(string: "https://x")!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+        }
+        await XCTAssertThrowsErrorAsync(try await self.makeService().fetchUsage(credentials: self.creds)) { error in
+            guard case UsageServiceError.notFound = error else {
+                return XCTFail("expected .notFound, got \(error)")
+            }
+        }
+    }
+
     func testThrowsUnexpectedOn500() async {
         StubURLProtocol.handler = { _ in
             (HTTPURLResponse(url: URL(string: "https://x")!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
@@ -267,6 +278,26 @@ final class UsageProviderTests: XCTestCase {
         } else {
             XCTFail("expected a refresh date")
         }
+    }
+
+    func testNotFoundWithoutOrgIdShowsRequiredMessage() async throws {
+        try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: ""))
+        StubURLProtocol.handler = { _ in
+            (HTTPURLResponse(url: URL(string: "https://x")!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+        }
+        let result = await awaitTimeline(makeProvider())
+        XCTAssertEqual(result.entries.first?.state, .error("Organization ID required — add it in settings"))
+        XCTAssertNil(result.refreshDate)
+    }
+
+    func testNotFoundWithOrgIdShowsCheckMessage() async throws {
+        try keychain.save(SessionCredentials(sessionKey: "sk", organizationId: "00000000-0000-0000-0000-000000000000"))
+        StubURLProtocol.handler = { _ in
+            (HTTPURLResponse(url: URL(string: "https://x")!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+        }
+        let result = await awaitTimeline(makeProvider())
+        XCTAssertEqual(result.entries.first?.state, .error("Organization not found — check your org ID in settings"))
+        XCTAssertNil(result.refreshDate)
     }
 
     func testNetworkErrorFallsBackToCache() async throws {
