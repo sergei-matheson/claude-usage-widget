@@ -27,27 +27,24 @@ struct SmallWidgetView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 4) {
-                progressArc
-                usageText
-                resetLabel
-                if isStale {
-                    staleLabel
-                }
+        VStack(spacing: 4) {
+            progressArc
+            usageText
+            resetLabel
+            if isStale {
+                staleLabel
             }
-            .padding(10)
-
             if showRefreshButton {
                 Button(intent: RefreshUsageIntent()) {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 11))
+                        .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .padding(6)
+                .padding(.top, 2)
             }
         }
+        .padding(10)
     }
 
     private var progressArc: some View {
