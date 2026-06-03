@@ -21,14 +21,19 @@ Run the install script (requires Xcode and [XcodeGen](https://github.com/yonasko
 
 This builds the app, copies it to `/Applications`, clears the quarantine flag, and registers the widget extension. Then open the app from `/Applications`.
 
-### 2. Enter your session token
+### 2. Enter your credentials
 
-The app opens to a settings screen. Paste your `sessionKey` cookie value there.
+The app opens to a settings screen. You need two values:
 
-To find it:
+**Session token** — the `sessionKey` cookie from claude.ai:
 1. Open [claude.ai](https://claude.ai) in Safari or Chrome
 2. Open DevTools → Application → Cookies → `https://claude.ai`
 3. Copy the value of the `sessionKey` cookie
+
+**Organization ID** — required; the personal usage endpoint was removed in June 2026:
+1. Open [claude.ai/settings/usage](https://claude.ai/settings/usage) in your browser
+2. Open DevTools → Network, reload the page, and find the `usage` API request
+3. Copy the organization ID from the request URL: `/api/organizations/{org_id}/usage`
 
 ### 3. Add the widget
 
@@ -51,6 +56,8 @@ To run a specific test class or method, pass its identifier:
 
 ## Notes
 
-- The session token is stored in the macOS Keychain.
+- Credentials (session token and org ID) are stored in the macOS Keychain.
 - Usage data refreshes every 30 minutes via WidgetKit's timeline.
-- Tap the widget to open the app and refresh immediately (or update the token if it expires).
+- The medium widget has a refresh button (↻) to trigger an immediate update.
+- If the widget shows an error, tap it to open the app and re-enter credentials.
+- The app's settings screen includes a **Diagnostics** section showing the last fetch time, data source (live or cached), and any errors.
