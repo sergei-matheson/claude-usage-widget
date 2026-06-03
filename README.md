@@ -30,7 +30,7 @@ The app opens to a settings screen. You need two values:
 2. Open DevTools → Application → Cookies → `https://claude.ai`
 3. Copy the value of the `sessionKey` cookie
 
-**Organization ID** — required; the personal usage endpoint was removed in June 2026:
+**Organization ID** — required:
 1. Open [claude.ai/settings/usage](https://claude.ai/settings/usage) in your browser
 2. Open DevTools → Network, reload the page, and find the `usage` API request
 3. Copy the organization ID from the request URL: `/api/organizations/{org_id}/usage`
